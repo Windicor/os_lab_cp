@@ -4,6 +4,7 @@
 
 #include <memory>
 
+#include "logger.h"
 #include "socket.h"
 
 class Server {
@@ -11,11 +12,15 @@ class Server {
   Server();
   ~Server();
 
-  void send(Message message);
+  void send(const Message& message);
   Message receive();
+
+  void log(std::string message);
 
  private:
   void* context_ = nullptr;
   std::unique_ptr<Socket> publiser_;
   std::unique_ptr<Socket> subscriber_;
+
+  Logger logger_;
 };

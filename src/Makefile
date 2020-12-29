@@ -6,7 +6,7 @@ EXECUTABLE2=client
 
 SRC1=server_main.cpp server.cpp
 SRC2=client_main.cpp client.cpp
-SRC=m_zmq.cpp socket.cpp
+SRC=m_zmq.cpp socket.cpp logger.cpp message.cpp
 
 OBJ1=$(SRC1:.cpp=.o)
 OBJ2=$(SRC2:.cpp=.o)

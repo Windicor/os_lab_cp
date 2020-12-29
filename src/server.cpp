@@ -10,7 +10,7 @@
 using namespace std;
 
 Server::Server() {
-  cerr << to_string(getpid()) + " Starting server..."s << endl;
+  log("Starting server...");
   context_ = create_zmq_context();
 
   string endpoint = create_endpoint(EndpointType::SERVER_PUB_GENERAL);
@@ -20,20 +20,27 @@ Server::Server() {
 }
 
 Server::~Server() {
-  cerr << to_string(getpid()) + " Destroying server..."s << endl;
+  log("Destroying server...");
   try {
     publiser_ = nullptr;
     subscriber_ = nullptr;
     destroy_zmq_context(context_);
   } catch (exception& ex) {
-    cerr << "Server wasn't destroyed: " << ex.what() << endl;
+    log("Server wasn't destroyed: "s + ex.what());
   }
 }
 
-void Server::send(Message message) {
+void Server::send(const Message& message) {
   publiser_->send(message);
+  log("Message sended from server: "s + message.get_stats());
 }
 
 Message Server::receive() {
-  return subscriber_->receive();
+  Message message = subscriber_->receive();
+  log("Message received by server: "s + message.get_stats());
+  return message;
+}
+
+void Server::log(std::string message) {
+  logger_.log(move(message));
 }

@@ -24,7 +24,7 @@ Socket::~Socket() {
   try {
     close_zmq_socket(socket_);
   } catch (exception& ex) {
-    cerr << "Socket wasn't closed: " << ex.what() << endl;
+    cout << "Socket wasn't closed: " << ex.what() << endl;
   }
 }
 

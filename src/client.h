@@ -5,6 +5,7 @@
 #include <memory>
 #include <string>
 
+#include "logger.h"
 #include "socket.h"
 
 class Client {
@@ -15,6 +16,8 @@ class Client {
   void send(const Message& message);
   Message receive();
 
+  void log(std::string message);
+
   friend void* second_thread(void* cli_arg);
 
  private:
@@ -24,4 +27,6 @@ class Client {
 
   pthread_t second_thread_id;
   bool terminated_ = false;
+
+  Logger logger_;
 };

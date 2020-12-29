@@ -14,7 +14,7 @@ void TerminateByUser(int) {
   if (server_ptr != nullptr) {
     server_ptr->~Server();
   }
-  cerr << to_string(getpid()) + " Server is terminated by user"s << endl;
+  server_ptr->log("Server is terminated by user");
   exit(0);
 }
 
@@ -29,15 +29,16 @@ int main() {
 
     Server server;
     server_ptr = &server;
-    cerr << to_string(getpid()) + " Server is started correctly"s << endl;
+    server.log("Server is started correctly");
 
     while (true) {
       Message msg = server.receive();
-      cout << "Message on server" << msg.text << endl;
+      if (msg.command == CommandType::PING) {
+        server.send(Message::ping_message());
+      }
     }
   } catch (exception& ex) {
-    cerr << to_string(getpid()) + " Server exception: "s << ex.what() << endl;
+    cout << ("Server exception: "s + ex.what() + "\nServer is terminated by exception");
   }
-  cerr << to_string(getpid()) + " Server is terminated by exception"s << endl;
   return ERR_TERMINATED;
 }

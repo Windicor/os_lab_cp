@@ -1,6 +1,5 @@
 #include "m_zmq.h"
 
-#include <errno.h>
 #include <unistd.h>
 #include <zmq.h>
 
@@ -54,7 +53,6 @@ void* create_zmq_socket(void* context, SocketType type) {
 }
 
 void close_zmq_socket(void* socket) {
-  //cerr << "closing socket..." << endl;
   sleep(1);  // Don't comment it, because sometimes zmq_close blocks
   if (zmq_close(socket) != 0) {
     throw runtime_error("Can't close socket");
@@ -100,17 +98,6 @@ void disconnect_zmq_socket(void* socket, string endpoint) {
   }
 }
 
-Message::Message() {}
-Message::Message(CommandType command, int from_id, int to_id, string text_str)
-    : command(command),
-      from_id(from_id),
-      to_id(to_id) {
-  if (text_str.size() > MAX_MESSAGE_SIZE) {
-    throw logic_error("Message text can't be longer, than MAX_MESSAGE_SIZE");
-  }
-  memcpy(text, text_str.data(), text_str.size() + 1);
-}
-
 void create_zmq_msg(zmq_msg_t* zmq_msg, const Message& msg) {
   zmq_msg_init_size(zmq_msg, sizeof(Message));
   memcpy(zmq_msg_data(zmq_msg), &msg, sizeof(Message));
@@ -129,7 +116,7 @@ Message get_zmq_msg(void* socket) {
   zmq_msg_t zmq_msg;
   zmq_msg_init(&zmq_msg);
   if (zmq_msg_recv(&zmq_msg, socket, 0) == -1) {
-    return Message{CommandType::ERROR, 0, 0, ""};
+    return Message::error_message();
   }
   Message msg;
   memcpy(&msg, zmq_msg_data(&zmq_msg), sizeof(Message));

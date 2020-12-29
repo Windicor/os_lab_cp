@@ -23,18 +23,19 @@ void* second_thread(void* cli_arg) {
           throw runtime_error("Can't receive message");
         }
       }
-      cerr << "Message on client: " << static_cast<int>(msg.command) << msg.text << endl;
+      client_ptr->log("Message received by client: "s + msg.get_stats());
+      //cout << msg.text << endl;
     }
 
   } catch (exception& ex) {
-    cerr << "Client exctption: " << ex.what() << "\nTerminated by exception on client receive loop" << endl;
+    client_ptr->log("Client exctption: "s + ex.what() + "\nTerminated by exception on client receive loop"s);
     exit(ERR_LOOP);
   }
   return NULL;
 }
 
 Client::Client() {
-  cerr << to_string(getpid()) + " Starting client..."s << endl;
+  log("Starting client...");
   context_ = create_zmq_context();
 
   string endpoint = create_endpoint(EndpointType::SERVER_SUB_GENERAL);
@@ -47,11 +48,11 @@ Client::Client() {
 
 Client::~Client() {
   if (terminated_) {
-    cerr << to_string(getpid()) + " Client double termination"s << endl;
+    log("Client double termination");
     return;
   }
 
-  cerr << to_string(getpid()) + " Destroying client..."s << endl;
+  log("Destroying client...");
   terminated_ = true;
 
   try {
@@ -59,14 +60,19 @@ Client::~Client() {
     subscriber_ = nullptr;
     destroy_zmq_context(context_);
   } catch (exception& ex) {
-    cerr << to_string(getpid()) + " " + " Client wasn't destroyed: "s << ex.what() << endl;
+    log("Client wasn't destroyed: "s + ex.what());
   }
 }
 
 void Client::send(const Message& message) {
   publiser_->send(message);
+  log("Message sended from client: "s + message.get_stats());
 }
 
 Message Client::receive() {
   return subscriber_->receive();
+}
+
+void Client::log(string message) {
+  logger_.log(move(message));
 }

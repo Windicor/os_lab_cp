@@ -15,16 +15,11 @@ void TerminateByUser(int) {
   if (client_ptr != nullptr) {
     client_ptr->~Client();
   }
-  cerr << to_string(getpid()) + " Terminated by user"s << endl;
+  client_ptr->log("Client is terminated by user");
   exit(0);
 }
 
-int main(int argc, char const* argv[]) {
-  if (argc != 3) {
-    cerr << argc;
-    cerr << "USAGE: " << argv[0] << " <id> <parrent_pub_endpoint" << endl;
-  }
-
+int main() {
   try {
     if (signal(SIGINT, TerminateByUser) == SIG_ERR) {
       throw runtime_error("Can't set SIGINT signal");
@@ -35,19 +30,16 @@ int main(int argc, char const* argv[]) {
 
     Client client;
     client_ptr = &client;
-    cerr << to_string(getpid()) + " Client is started correctly"s << endl;
+    client.log("Client is started correctly");
 
     string text;
     while (cin >> text) {
-      Message msg(CommandType::RETURN, 0, 0, text);
-      client.send(msg);
-      cerr << "Message sended" << endl;
+      client.send(Message::ping_message());
     }
 
   } catch (exception& ex) {
-    cerr << to_string(getpid()) + " Client exception: "s << ex.what() << "\nTerminated by exception" << endl;
+    cout << (to_string(getpid()) + " Client exception: "s + ex.what() + "\nClient terminated by exception"s) << endl;
     exit(ERR_TERMINATED);
   }
-  cerr << to_string(getpid()) + " Client is finished correctly"s << endl;
   return 0;
 }
