@@ -7,6 +7,7 @@
 using namespace std;
 
 const int ERR_LOOP = 2;
+const int MESSAGE_WAITING_TIME = 1;
 
 void* second_thread(void* cli_arg) {
   Client* client_ptr = (Client*)cli_arg;
@@ -24,7 +25,15 @@ void* second_thread(void* cli_arg) {
         }
       }
       client_ptr->log("Message received by client: "s + msg.get_stats());
-      //cout << msg.text << endl;
+      switch (msg.command) {
+        case CommandType::PING:
+          client_ptr->server_is_avaible_ = true;
+          break;
+
+        default:
+          throw logic_error("Undefined command type");
+          break;
+      }
     }
 
   } catch (exception& ex) {
@@ -32,6 +41,15 @@ void* second_thread(void* cli_arg) {
     exit(ERR_LOOP);
   }
   return NULL;
+}
+
+void Client::check_server_availability() {
+  while (!server_is_avaible_) {
+    cout << "Trying to connect to the server..." << endl;
+    send(Message::ping_message());
+    sleep(MESSAGE_WAITING_TIME);
+  }
+  cout << "Server is available" << endl;
 }
 
 Client::Client() {
@@ -42,7 +60,8 @@ Client::Client() {
   publiser_ = make_unique<Socket>(context_, SocketType::PUBLISHER, endpoint);
 
   if (pthread_create(&second_thread_id, 0, second_thread, this) != 0) {
-    throw runtime_error("Can't run second thread");
+    cout << "Can't run second thread" << endl;
+    exit(ERR_LOOP);
   }
 }
 

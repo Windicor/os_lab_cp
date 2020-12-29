@@ -17,6 +17,7 @@ class Client {
   Message receive();
 
   void log(std::string message);
+  void check_server_availability();
 
   friend void* second_thread(void* cli_arg);
 
@@ -28,5 +29,7 @@ class Client {
   pthread_t second_thread_id;
   bool terminated_ = false;
 
-  Logger logger_;
+  Logger logger_ = Logger(/*"log.txt"*/);
+
+  bool server_is_avaible_ = false;
 };

@@ -14,8 +14,8 @@ Client* client_ptr = nullptr;
 void TerminateByUser(int) {
   if (client_ptr != nullptr) {
     client_ptr->~Client();
+    client_ptr->log("Client is terminated by user");
   }
-  client_ptr->log("Client is terminated by user");
   exit(0);
 }
 
@@ -31,6 +31,8 @@ int main() {
     Client client;
     client_ptr = &client;
     client.log("Client is started correctly");
+
+    client.check_server_availability();
 
     string text;
     while (cin >> text) {

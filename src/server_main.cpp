@@ -13,8 +13,8 @@ Server* server_ptr = nullptr;
 void TerminateByUser(int) {
   if (server_ptr != nullptr) {
     server_ptr->~Server();
+    server_ptr->log("Server is terminated by user");
   }
-  server_ptr->log("Server is terminated by user");
   exit(0);
 }
 
