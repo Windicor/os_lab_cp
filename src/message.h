@@ -4,21 +4,22 @@
 
 enum class CommandType {
   ERROR,
-  PING,
+  CONNECT
 };
 
 struct Message {
   CommandType command = CommandType::ERROR;
-  int from_id;
-  int to_id;
+  int from_id = 0;
+  int to_id = 0;
+  int value = 0;
 
   Message() = default;
-  Message(CommandType command, int from_id, int to_id);
+  Message(CommandType command, int from_id, int to_id, int value);
 
   std::string get_stats() const;
 
   static Message error_message();
-  static Message ping_message();
+  static Message connect_message(int id);
 };
 
 struct TextMessage : Message {

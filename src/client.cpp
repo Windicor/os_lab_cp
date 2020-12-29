@@ -1,5 +1,7 @@
 #include "client.h"
 
+#include <cstdlib>
+#include <ctime>
 #include <iostream>
 
 #include "m_zmq.h"
@@ -24,10 +26,25 @@ void* second_thread(void* cli_arg) {
           throw runtime_error("Can't receive message");
         }
       }
+      if (msg.to_id != client_ptr->id()) {
+        continue;
+      }
       client_ptr->log("Message received by client: "s + msg.get_stats());
       switch (msg.command) {
-        case CommandType::PING:
+        case CommandType::CONNECT:
+          pthread_mutex_lock(&client_ptr->socket_change_mutex_);
+          client_ptr->id_ = msg.value;
           client_ptr->server_is_avaible_ = true;
+
+          endpoint = create_endpoint(EndpointType::CLIENT_PUB, client_ptr->id());
+          client_ptr->publiser_ = nullptr;
+          client_ptr->publiser_ = make_unique<Socket>(client_ptr->context_, SocketType::PUBLISHER, endpoint);
+
+          endpoint = create_endpoint(EndpointType::SERVER_PUB, client_ptr->id());
+          client_ptr->subscriber_ = nullptr;
+          client_ptr->subscriber_ = make_unique<Socket>(client_ptr->context_, SocketType::SUBSCRIBER, endpoint);
+
+          pthread_mutex_unlock(&client_ptr->socket_change_mutex_);
           break;
 
         default:
@@ -43,13 +60,22 @@ void* second_thread(void* cli_arg) {
   return NULL;
 }
 
-void Client::check_server_availability() {
+void Client::refresh_publisher() {
+  pthread_mutex_lock(&socket_change_mutex_);
+  static string endpoint = create_endpoint(EndpointType::SERVER_SUB_GENERAL);
+  publiser_ = nullptr;
+  publiser_ = make_unique<Socket>(context_, SocketType::PUBLISHER, endpoint);
+  pthread_mutex_unlock(&socket_change_mutex_);
+}
+
+void Client::connect_to_server() {
   while (!server_is_avaible_) {
+    //refresh_publisher();
     cout << "Trying to connect to the server..." << endl;
-    send(Message::ping_message());
+    send(Message::connect_message(id_));
     sleep(MESSAGE_WAITING_TIME);
   }
-  cout << "Server is available" << endl;
+  cout << "Connected to server" << endl;
 }
 
 Client::Client() {
@@ -59,10 +85,16 @@ Client::Client() {
   string endpoint = create_endpoint(EndpointType::SERVER_SUB_GENERAL);
   publiser_ = make_unique<Socket>(context_, SocketType::PUBLISHER, endpoint);
 
-  if (pthread_create(&second_thread_id, 0, second_thread, this) != 0) {
+  if (pthread_mutex_init(&socket_change_mutex_, NULL) != 0) {
+    throw runtime_error("Can't init mutex");
+  }
+  if (pthread_create(&second_thread_id_, 0, second_thread, this) != 0) {
     cout << "Can't run second thread" << endl;
     exit(ERR_LOOP);
   }
+
+  srand(time(NULL) + clock());
+  id_ = rand();
 }
 
 Client::~Client() {
@@ -78,9 +110,17 @@ Client::~Client() {
     publiser_ = nullptr;
     subscriber_ = nullptr;
     destroy_zmq_context(context_);
+
+    if (pthread_mutex_destroy(&socket_change_mutex_) != 0) {
+      throw runtime_error("Can't destroy mutex");
+    }
   } catch (exception& ex) {
     log("Client wasn't destroyed: "s + ex.what());
   }
+}
+
+int Client::id() const {
+  return id_;
 }
 
 void Client::send(const Message& message) {

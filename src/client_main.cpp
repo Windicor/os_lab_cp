@@ -32,11 +32,11 @@ int main() {
     client_ptr = &client;
     client.log("Client is started correctly");
 
-    client.check_server_availability();
+    client.connect_to_server();
 
     string text;
     while (cin >> text) {
-      client.send(Message::ping_message());
+      //client.send(Message::connect_message());
     }
 
   } catch (exception& ex) {

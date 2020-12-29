@@ -52,6 +52,14 @@ void Socket::subscribe(std::string endpoint) {
   }
 }
 
+void Socket::unsubscribe(std::string endpoint) {
+  if (socket_type_ == SocketType::SUBSCRIBER) {
+    disconnect_zmq_socket(socket_, endpoint);
+  } else {
+    throw logic_error("Unsubscribe is only for SUB sockets");
+  }
+}
+
 string Socket::endpoint() const {
   return endpoint_;
 }

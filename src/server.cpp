@@ -14,7 +14,7 @@ Server::Server() {
   context_ = create_zmq_context();
 
   string endpoint = create_endpoint(EndpointType::SERVER_PUB_GENERAL);
-  publiser_ = make_unique<Socket>(context_, SocketType::PUBLISHER, endpoint);
+  general_publiser_ = make_unique<Socket>(context_, SocketType::PUBLISHER, endpoint);
   endpoint = create_endpoint(EndpointType::SERVER_SUB_GENERAL);
   subscriber_ = make_unique<Socket>(context_, SocketType::SUBSCRIBER, endpoint);
 }
@@ -22,8 +22,11 @@ Server::Server() {
 Server::~Server() {
   log("Destroying server...");
   try {
-    publiser_ = nullptr;
+    general_publiser_ = nullptr;
     subscriber_ = nullptr;
+    for (auto& [_, ptr] : id_to_publisher_) {
+      ptr = nullptr;
+    }
     destroy_zmq_context(context_);
   } catch (exception& ex) {
     log("Server wasn't destroyed: "s + ex.what());
@@ -31,7 +34,7 @@ Server::~Server() {
 }
 
 void Server::send(const Message& message) {
-  publiser_->send(message);
+  general_publiser_->send(message);
   log("Message sended from server: "s + message.get_stats());
 }
 
@@ -43,4 +46,14 @@ Message Server::receive() {
 
 void Server::log(std::string message) {
   logger_.log(move(message));
+}
+
+void Server::add_connection(int id) {
+  int new_id = id_cntr++;
+  string endpoint = create_endpoint(EndpointType::SERVER_PUB, new_id);
+  id_to_publisher_[new_id] = make_unique<Socket>(context_, SocketType::PUBLISHER, endpoint);
+  endpoint = create_endpoint(EndpointType::CLIENT_PUB, new_id);
+  subscriber_->subscribe(endpoint);
+
+  send(Message(CommandType::CONNECT, 0, id, new_id));
 }

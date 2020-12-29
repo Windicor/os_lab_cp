@@ -33,12 +33,12 @@ int main() {
 
     while (true) {
       Message msg = server.receive();
-      if (msg.command == CommandType::PING) {
-        server.send(Message::ping_message());
+      if (msg.command == CommandType::CONNECT) {
+        server.add_connection(msg.from_id);
       }
     }
   } catch (exception& ex) {
-    cout << ("Server exception: "s + ex.what() + "\nServer is terminated by exception");
+    cerr << ("Server exception: "s + ex.what() + "\nServer is terminated by exception");
   }
   return ERR_TERMINATED;
 }

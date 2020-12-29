@@ -44,10 +44,10 @@ void* create_zmq_socket(void* context, SocketType type) {
     if (zmq_setsockopt(socket, ZMQ_SUBSCRIBE, 0, 0) == -1) {
       throw runtime_error("Can't set ZMQ_SUBSCRIBE option");
     }
-    int linger_period = 0;
-    if (zmq_setsockopt(socket, ZMQ_LINGER, &linger_period, sizeof(int)) == -1) {
-      throw runtime_error("Can't set ZMQ_LINGER option");
-    }
+  }
+  int linger_period = 0;
+  if (zmq_setsockopt(socket, ZMQ_LINGER, &linger_period, sizeof(int)) == -1) {
+    throw runtime_error("Can't set ZMQ_LINGER option");
   }
   return socket;
 }

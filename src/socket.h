@@ -18,6 +18,7 @@ class Socket {
   Message receive();
 
   void subscribe(std::string endpoint);
+  void unsubscribe(std::string endpoint);
   std::string endpoint() const;
 
  private:
