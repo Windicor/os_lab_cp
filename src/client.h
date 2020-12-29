@@ -31,7 +31,6 @@ class Client {
 
   pthread_t second_thread_id_;
   bool server_is_avaible_ = false;
-  pthread_mutex_t socket_change_mutex_;
 
   bool terminated_ = false;
   Logger logger_ = Logger(/*"log.txt"*/);
