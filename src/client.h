@@ -34,6 +34,4 @@ class Client {
 
   bool terminated_ = false;
   Logger logger_ = Logger(/*"log.txt"*/);
-
-  void refresh_publisher();
 };
