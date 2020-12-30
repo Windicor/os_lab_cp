@@ -17,7 +17,7 @@ void* second_thread(void* cli_arg) {
     string endpoint = create_endpoint(EndpointType::SERVER_PUB_GENERAL);
     client_ptr->subscriber_ = make_unique<Socket>(client_ptr->context_, SocketType::SUBSCRIBER, endpoint);
 
-    while (true) {
+    while (!client_ptr->terminated_) {
       shared_ptr<Message> msg_ptr = client_ptr->receive();
       if (msg_ptr->command == CommandType::ERROR) {
         if (client_ptr->terminated_) {
@@ -95,6 +95,7 @@ Client::~Client() {
     publiser_ = nullptr;
     subscriber_ = nullptr;
     destroy_zmq_context(context_);
+    pthread_join(second_thread_id_, NULL);
   } catch (exception& ex) {
     log("Client wasn't destroyed: "s + ex.what());
   }
