@@ -54,6 +54,10 @@ bool Security::Register(string username, LogAndPas log_n_pass) {
   if (it != uname_to_lap_.end()) {
     return false;
   }
+  auto it2 = lap_to_uname_.find(log_n_pass);
+  if (it2 != lap_to_uname_.end()) {
+    return false;
+  }
   uname_to_lap_[username] = log_n_pass;
   lap_to_uname_[move(log_n_pass)] = move(username);
   return true;

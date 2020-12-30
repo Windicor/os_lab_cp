@@ -24,7 +24,8 @@ void* second_thread(void* cli_arg) {
         if (client_ptr->terminated_) {
           return NULL;
         } else {
-          throw runtime_error("Can't receive message");
+          cout << "Error" << endl;
+          continue;
         }
       }
       if (msg_ptr->to_id != client_ptr->id()) {
@@ -47,10 +48,25 @@ void* second_thread(void* cli_arg) {
         case CommandType::REGISTER:
         case CommandType::LOGIN:
           if (msg_ptr->value) {
-            client_ptr->status_ = Client::Status::LOGGED;
+            client_ptr->status = Client::Status::LOGGED;
           } else {
-            client_ptr->status_ = Client::Status::LOG_ERROR;
+            client_ptr->status = Client::Status::LOG_ERROR;
           }
+          break;
+        case CommandType::CREATE_CHAT:
+          if (msg_ptr->value) {
+            cout << "You're in chat with: " << ((TextMessage*)msg_ptr.get())->text << endl;
+            client_ptr->status = Client::Status::IN_CHAT;
+          } else {
+            cout << "Can't create chat" << endl;
+          }
+          break;
+        case CommandType::LEFT_CHAT:
+          cout << "Companion left the chat" << endl;
+          client_ptr->status = Client::Status::LOGGED;
+          break;
+        case CommandType::TEXT:
+          cout << ((TextMessage*)msg_ptr.get())->text << endl;
           break;
         default:
           throw logic_error("Undefined command type");
@@ -137,13 +153,13 @@ void Client::login_form() {
   if (!(cin >> log >> pas)) {
     throw runtime_error("Incorrect input");
   }
-  status_ = Client::Status::UNLOGGED;
+  status = Client::Status::UNLOGGED;
   send(make_shared<TextMessage>(CommandType::LOGIN, id_, 0, md5sum(log) + " "s + md5sum(pas)));
-  while (status_ == Client::Status::UNLOGGED) {
+  while (status == Client::Status::UNLOGGED) {
     cout << "Checking..." << endl;
     sleep(1);
   }
-  if (status_ == Client::Status::LOG_ERROR) {
+  if (status == Client::Status::LOG_ERROR) {
     cout << "Please, try again" << endl;
   }
 }
@@ -154,19 +170,19 @@ void Client::register_form() {
   if (!(cin >> uname >> log >> pas)) {
     throw runtime_error("Incorrect input");
   }
-  status_ = Client::Status::UNLOGGED;
+  status = Client::Status::UNLOGGED;
   send(make_shared<TextMessage>(CommandType::REGISTER, id_, 0, uname + " "s + md5sum(log) + " "s + md5sum(pas)));
-  while (status_ == Client::Status::UNLOGGED) {
+  while (status == Client::Status::UNLOGGED) {
     cout << "Checking..." << endl;
     sleep(1);
   }
-  if (status_ == Client::Status::LOG_ERROR) {
+  if (status == Client::Status::LOG_ERROR) {
     cout << "Please, try again" << endl;
   }
 }
 
-void Client::enter() {
-  while (status_ != Client::Status::LOGGED) {
+void Client::enter_in_system() {
+  while (status != Client::Status::LOGGED) {
     cout << "Do you have an account? (y/n)" << endl;
     string str;
     if (!(cin >> str)) {
@@ -184,5 +200,17 @@ void Client::enter() {
 }
 
 void Client::send_text_msg(string message) {
-  send(make_shared<TextMessage>(CommandType::TEXT, id_, 0, move(message)));
+  if (message != "") {
+    send(make_shared<TextMessage>(CommandType::TEXT, id_, 0, move(message)));
+  }
+}
+
+void Client::enter_chat() {
+  cout << "Enter your companion username" << endl;
+  string uname;
+  if (cin >> uname) {
+    if (status != Client::Status::IN_CHAT) {
+      send(make_shared<TextMessage>(CommandType::CREATE_CHAT, id_, 0, move(uname)));
+    }
+  }
 }

@@ -33,11 +33,18 @@ int main() {
     client.log("Client is started correctly");
 
     client.connect_to_server();
-    client.enter();
+    client.enter_in_system();
 
     string text;
     while (getline(cin, text)) {
-      client.send_text_msg(move(text));
+      if (text == "") {
+        continue;
+      }
+      if (client.status == Client::Status::IN_CHAT) {
+        client.send_text_msg(move(text));
+      } else {
+        client.enter_chat();
+      }
     }
 
   } catch (exception& ex) {

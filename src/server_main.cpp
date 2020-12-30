@@ -31,7 +31,7 @@ void parse_cmd(Server& server, shared_ptr<Message> msg_ptr) {
         server.log("Text command in non text message");
         break;
       }
-      cout << "Text: \"" << ((TextMessage*)msg_ptr.get())->text << "\"" << endl;
+      server.send_from_user_to_user(msg_ptr->from_id, msg_ptr);
       break;
     case CommandType::REGISTER:
       if (msg_ptr->type() != MessageType::TEXT) {
@@ -46,6 +46,16 @@ void parse_cmd(Server& server, shared_ptr<Message> msg_ptr) {
         break;
       }
       server.login_form(msg_ptr);
+      break;
+    case CommandType::CREATE_CHAT:
+      if (msg_ptr->type() != MessageType::TEXT) {
+        server.log("Register command in non text message");
+        break;
+      }
+      server.create_room(msg_ptr->from_id, ((TextMessage*)msg_ptr.get())->text);
+      break;
+    case CommandType::LEFT_CHAT:
+      server.exit_room(msg_ptr->from_id);
       break;
     default:
       throw logic_error("Unimplemented command type");

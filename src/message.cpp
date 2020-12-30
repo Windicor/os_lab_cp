@@ -31,8 +31,8 @@ TextMessage::TextMessage() {
   type_ = MessageType::TEXT;
   text[0] = '\0';
 }
-TextMessage::TextMessage(CommandType command, int from_id, int to_id, string text_str)
-    : Message(command, from_id, to_id, 0) {
+TextMessage::TextMessage(CommandType command, int from_id, int to_id, string text_str, int value)
+    : Message(command, from_id, to_id, value) {
   type_ = MessageType::TEXT;
   if (text_str.size() > MAX_MESSAGE_SIZE) {
     throw logic_error("Message text can't be longer, than MAX_MESSAGE_SIZE");

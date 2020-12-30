@@ -46,6 +46,31 @@ bool Online::check_username(std::string username) const {
   return it != username_to_id_.end();
 }
 
+bool Rooms::add_room(int id1, int id2) {
+  if (rooms_.count(id1) > 0 || rooms_.count(id2) > 0) {
+    return false;
+  }
+  rooms_[id1] = id2;
+  rooms_[id2] = id1;
+  return true;
+}
+void Rooms::remove_room(int id) {
+  int id2 = rooms_[id];
+  rooms_.erase(id);
+  rooms_.erase(id2);
+}
+optional<int> Rooms::get_companion(int id) const {
+  auto it = rooms_.find(move(id));
+  if (it != rooms_.end()) {
+    return it->second;
+  } else {
+    return nullopt;
+  }
+}
+bool Rooms::check_companion(int id) const {
+  return (bool)get_companion(id);
+}
+
 Server::Server() {
   log("Starting server...");
   context_ = create_zmq_context();
@@ -86,19 +111,16 @@ void Server::send_to_user(int id, std::shared_ptr<Message> message) {
   id_to_publisher_[id]->send(message);
   log("Message sended from server to "s + to_string(id) + ": "s + message->get_stats());
 }
-/*
-void Server::send_from_user_to_user(int from_id, int to_id, std::shared_ptr<Message> message) {
-  auto it = id_to_publisher_.find(from_id);
-  if (it == id_to_publisher_.end()) {
-    log("Message to id, that does not exist");
+
+void Server::send_from_user_to_user(int from_id, std::shared_ptr<Message> message) {
+  auto opt = rooms_.get_companion(from_id);
+  if (!opt) {
+    send_to_user(from_id, Message::error_message());
     return;
   }
-  message->from_id = from_id;
-  message->to_id = to_id;
-  id_to_publisher_[to_id]->send(message);
-  log("Message sended from " + to_string(from_id) + " to "s + to_string(to_id) + ": "s + message->get_stats());
+  int to_id = *opt;
+  send_to_user(to_id, message);
 }
-*/
 
 shared_ptr<Message> Server::receive() {
   shared_ptr<Message> message = subscriber_->receive();
@@ -124,7 +146,34 @@ void Server::add_connection(int id) {
   send_to_general(make_shared<Message>(CommandType::CONNECT, 0, id, new_id));
 }
 
+void print_bool(bool b) {
+  cout << b << endl;
+}
+
+void Server::create_room(int from_id, string username) {
+  auto opt = online_.get_id(username);
+  cout << *online_.get_username(from_id) << "a a" << username << "a" << endl;
+  if (!opt || rooms_.check_companion(from_id) || rooms_.check_companion(*opt) || *online_.get_username(from_id) == username) {
+    send_to_user(from_id, make_shared<Message>(CommandType::CREATE_CHAT, 0, from_id, 0));
+    return;
+  }
+  int to_id = *opt;
+  rooms_.add_room(from_id, to_id);
+  send_to_user(from_id, make_shared<TextMessage>(CommandType::CREATE_CHAT, 0, from_id, *online_.get_username(to_id), 1));
+  send_to_user(to_id, make_shared<TextMessage>(CommandType::CREATE_CHAT, 0, to_id, *online_.get_username(from_id), 1));
+}
+
+void Server::exit_room(int id) {
+  auto opt = rooms_.get_companion(id);
+  if (opt) {
+    int companion_id = *opt;
+    send_to_user(companion_id, make_shared<Message>(CommandType::LEFT_CHAT, 0, companion_id, 0));
+  }
+  rooms_.remove_room(id);
+}
+
 void Server::remove_connection(int id) {
+  exit_room(id);
   online_.remove_user(id);
   id_to_publisher_.erase(id);
   string endpoint = create_endpoint(EndpointType::CLIENT_PUB, id);

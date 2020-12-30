@@ -14,7 +14,9 @@ enum class CommandType {
   DISCONNECT,
   TEXT,
   REGISTER,
-  LOGIN
+  LOGIN,
+  CREATE_CHAT,
+  LEFT_CHAT
 };
 
 class Message {
@@ -49,5 +51,5 @@ class TextMessage : public Message {
   char text[MAX_MESSAGE_SIZE + 1];
 
   TextMessage();
-  TextMessage(CommandType command, int from_id, int to_id, std::string text);
+  TextMessage(CommandType command, int from_id, int to_id, std::string text, int value = 0);
 };

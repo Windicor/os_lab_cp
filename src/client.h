@@ -17,13 +17,22 @@ class Client {
   void connect_to_server();
   void disconnect_from_server();
 
-  void enter();
+  void enter_in_system();
   void register_form();
   void login_form();
 
   void send_text_msg(std::string message);
+  void enter_chat();
 
   int id() const;
+
+  enum class Status {
+    UNLOGGED,
+    LOGGED,
+    LOG_ERROR,
+    IN_CHAT
+  };
+  Status status = Status::UNLOGGED;
 
   friend void* second_thread(void* cli_arg);
 
@@ -37,14 +46,7 @@ class Client {
   bool server_is_avaible_ = false;
 
   bool terminated_ = false;
-  Logger logger_ = Logger(/*"log.txt"*/);
-
-  enum class Status {
-    UNLOGGED,
-    LOGGED,
-    LOG_ERROR
-  };
-  Status status_ = Status::UNLOGGED;
+  Logger logger_ = Logger("log.txt");
 
   void send(std::shared_ptr<Message> message);
   std::shared_ptr<Message> receive();
