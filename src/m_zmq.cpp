@@ -76,7 +76,7 @@ string create_endpoint(EndpointType type, int id) {
 
 void bind_zmq_socket(void* socket, string endpoint) {
   if (zmq_bind(socket, endpoint.data()) != 0) {
-    throw runtime_error("Can't bind socket");
+    throw runtime_error("Can't bind socket (create 'tmp' folder)");
   }
 }
 
@@ -88,7 +88,7 @@ void unbind_zmq_socket(void* socket, string endpoint) {
 
 void connect_zmq_socket(void* socket, string endpoint) {
   if (zmq_connect(socket, endpoint.data()) != 0) {
-    throw runtime_error("Can't connect socket");
+    throw runtime_error("Can't connect socket (create 'tmp' folder)");
   }
 }
 

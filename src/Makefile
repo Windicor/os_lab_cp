@@ -1,5 +1,5 @@
 CC=g++
-CFLAGS=-std=c++17 -pedantic -Wall -Wextra -Wno-unused-variable -g
+CFLAGS=-std=c++17 -pedantic -Wall -Wextra -Wno-unused-variable 
 LFLAGS=-lzmq -lpthread
 EXECUTABLE1=server
 EXECUTABLE2=client

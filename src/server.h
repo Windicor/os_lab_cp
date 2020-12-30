@@ -3,11 +3,25 @@
 #include <unistd.h>
 
 #include <memory>
+#include <optional>
 #include <unordered_map>
 
 #include "logger.h"
 #include "security.h"
 #include "socket.h"
+
+class Online {
+ public:
+  void add_user(std::string username, int id);
+  void remove_user(int id);
+  std::optional<int> get_id(std::string username) const;
+  std::optional<std::string> get_username(int id) const;
+  bool check_username(std::string username) const;
+
+ private:
+  std::unordered_map<int, std::string> id_to_username_;
+  std::unordered_map<std::string, int> username_to_id_;
+};
 
 class Server {
  public:
@@ -20,13 +34,14 @@ class Server {
   void add_connection(int id);
   void remove_connection(int id);
   void register_form(std::shared_ptr<Message> msg_ptr);
+  void login_form(std::shared_ptr<Message> msg_ptr);
 
  private:
   void* context_ = nullptr;
   std::unique_ptr<Socket> subscriber_;
   std::unique_ptr<Socket> general_publiser_;
   std::unordered_map<int, std::unique_ptr<Socket>> id_to_publisher_;
-  std::unordered_map<int, std::string> id_to_username_;
+  Online online_;
 
   int id_cntr = 0;
 

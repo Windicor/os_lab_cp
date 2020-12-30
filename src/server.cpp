@@ -10,6 +10,42 @@
 
 using namespace std;
 
+void Online::add_user(std::string username, int id) {
+  id_to_username_[id] = username;
+  username_to_id_[move(username)] = id;
+}
+void Online::remove_user(int id) {
+  auto it = id_to_username_.find(id);
+  if (it != id_to_username_.end()) {
+    string user = it->second;
+    auto it2 = username_to_id_.find(move(user));
+    id_to_username_.erase(it);
+    username_to_id_.erase(it2);
+  } else {
+    cerr << "User to remove not found" << endl;
+  }
+}
+optional<int> Online::get_id(std::string username) const {
+  auto it = username_to_id_.find(move(username));
+  if (it != username_to_id_.end()) {
+    return it->second;
+  } else {
+    return nullopt;
+  }
+}
+optional<std::string> Online::get_username(int id) const {
+  auto it = id_to_username_.find(id);
+  if (it != id_to_username_.end()) {
+    return it->second;
+  } else {
+    return nullopt;
+  }
+}
+bool Online::check_username(std::string username) const {
+  auto it = username_to_id_.find(move(username));
+  return it != username_to_id_.end();
+}
+
 Server::Server() {
   log("Starting server...");
   context_ = create_zmq_context();
@@ -89,6 +125,7 @@ void Server::add_connection(int id) {
 }
 
 void Server::remove_connection(int id) {
+  online_.remove_user(id);
   id_to_publisher_.erase(id);
   string endpoint = create_endpoint(EndpointType::CLIENT_PUB, id);
   subscriber_->unsubscribe(move(endpoint));
@@ -103,8 +140,23 @@ void Server::register_form(std::shared_ptr<Message> msg_ptr) {
   iss >> uname >> lap;
   if (security.Register(uname, move(lap))) {
     send_to_user(msg_ptr->from_id, make_shared<Message>(CommandType::REGISTER, 0, msg_ptr->from_id, 1));
+    online_.add_user(uname, msg_ptr->from_id);
   } else {
     send_to_user(msg_ptr->from_id, make_shared<Message>(CommandType::REGISTER, 0, msg_ptr->from_id, 0));
   }
-  id_to_username_[msg_ptr->from_id] = uname;
+}
+
+void Server::login_form(std::shared_ptr<Message> msg_ptr) {
+  TextMessage* text_msg_ptr = (TextMessage*)msg_ptr.get();
+  istringstream iss(text_msg_ptr->text);
+  LogAndPas lap;
+  iss >> lap;
+
+  auto opt_uname = security.get_username(move(lap));
+  if (opt_uname && !online_.check_username(*opt_uname)) {
+    send_to_user(msg_ptr->from_id, make_shared<Message>(CommandType::LOGIN, 0, msg_ptr->from_id, 1));
+    online_.add_user(*opt_uname, msg_ptr->from_id);
+  } else {
+    send_to_user(msg_ptr->from_id, make_shared<Message>(CommandType::LOGIN, 0, msg_ptr->from_id, 0));
+  }
 }

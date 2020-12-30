@@ -40,6 +40,13 @@ void parse_cmd(Server& server, shared_ptr<Message> msg_ptr) {
       }
       server.register_form(msg_ptr);
       break;
+    case CommandType::LOGIN:
+      if (msg_ptr->type() != MessageType::TEXT) {
+        server.log("Login command in non text message");
+        break;
+      }
+      server.login_form(msg_ptr);
+      break;
     default:
       throw logic_error("Unimplemented command type");
   }

@@ -5,6 +5,7 @@
 #include <iostream>
 
 #include "m_zmq.h"
+#include "md5sum.h"
 
 using namespace std;
 
@@ -43,7 +44,14 @@ void* second_thread(void* cli_arg) {
           client_ptr->subscriber_ = nullptr;
           client_ptr->subscriber_ = make_unique<Socket>(client_ptr->context_, SocketType::SUBSCRIBER, move(endpoint));
           break;
-
+        case CommandType::REGISTER:
+        case CommandType::LOGIN:
+          if (msg_ptr->value) {
+            client_ptr->status_ = Client::Status::LOGGED;
+          } else {
+            client_ptr->status_ = Client::Status::LOG_ERROR;
+          }
+          break;
         default:
           throw logic_error("Undefined command type");
           break;
@@ -69,11 +77,8 @@ Client::Client() {
     exit(ERR_LOOP);
   }
 
-  log("Client is started correctly");
-
   srand(time(NULL) + clock());
   id_ = rand();
-  connect_to_server();
 }
 
 Client::~Client() {
@@ -124,6 +129,58 @@ void Client::connect_to_server() {
 void Client::disconnect_from_server() {
   cout << "Disconnecting from the server..." << endl;
   send(Message::disconnect_message(id_));
+}
+
+void Client::login_form() {
+  cout << "Enter login and password" << endl;
+  string uname, log, pas;
+  if (!(cin >> log >> pas)) {
+    throw runtime_error("Incorrect input");
+  }
+  status_ = Client::Status::UNLOGGED;
+  send(make_shared<TextMessage>(CommandType::LOGIN, id_, 0, md5sum(log) + " "s + md5sum(pas)));
+  while (status_ == Client::Status::UNLOGGED) {
+    cout << "Checking..." << endl;
+    sleep(1);
+  }
+  if (status_ == Client::Status::LOG_ERROR) {
+    cout << "Please, try again" << endl;
+  }
+}
+
+void Client::register_form() {
+  cout << "Enter username, login and password" << endl;
+  string uname, log, pas;
+  if (!(cin >> uname >> log >> pas)) {
+    throw runtime_error("Incorrect input");
+  }
+  status_ = Client::Status::UNLOGGED;
+  send(make_shared<TextMessage>(CommandType::REGISTER, id_, 0, uname + " "s + md5sum(log) + " "s + md5sum(pas)));
+  while (status_ == Client::Status::UNLOGGED) {
+    cout << "Checking..." << endl;
+    sleep(1);
+  }
+  if (status_ == Client::Status::LOG_ERROR) {
+    cout << "Please, try again" << endl;
+  }
+}
+
+void Client::enter() {
+  while (status_ != Client::Status::LOGGED) {
+    cout << "Do you have an account? (y/n)" << endl;
+    string str;
+    if (!(cin >> str)) {
+      throw runtime_error("Incorrect input");
+    }
+    if (str == "y") {
+      login_form();
+    } else if (str == "n") {
+      register_form();
+    } else {
+      cout << "Please, answer 'y' or 'n'" << endl;
+    }
+  }
+  cout << "Autorized" << endl;
 }
 
 void Client::send_text_msg(string message) {

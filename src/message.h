@@ -13,7 +13,8 @@ enum class CommandType {
   CONNECT,
   DISCONNECT,
   TEXT,
-  REGISTER
+  REGISTER,
+  LOGIN
 };
 
 class Message {
