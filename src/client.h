@@ -13,9 +13,6 @@ class Client {
   Client();
   ~Client();
 
-  void send(const Message& message);
-  Message receive();
-
   void log(std::string message);
   void connect_to_server();
 
@@ -34,4 +31,7 @@ class Client {
 
   bool terminated_ = false;
   Logger logger_ = Logger(/*"log.txt"*/);
+
+  void send(std::shared_ptr<Message> message);
+  std::shared_ptr<Message> receive();
 };

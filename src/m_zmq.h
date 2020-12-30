@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <string>
 
 #include "message.h"
@@ -27,5 +28,5 @@ void unbind_zmq_socket(void* socket, std::string endpoint);
 void connect_zmq_socket(void* socket, std::string endpoint);
 void disconnect_zmq_socket(void* socket, std::string endpoint);
 
-void send_zmq_msg(void* socket, const Message& msg);
-Message get_zmq_msg(void* socket);
+void send_zmq_msg(void* socket, std::shared_ptr<Message> msg);
+std::shared_ptr<Message> get_zmq_msg(void* socket);

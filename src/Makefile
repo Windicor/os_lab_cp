@@ -1,12 +1,12 @@
 CC=g++
-CFLAGS=-std=c++17 -pedantic -Wall -Wextra -Wno-unused-variable
+CFLAGS=-std=c++17 -pedantic -Wall -Wextra -Wno-unused-variable -g
 LFLAGS=-lzmq -lpthread
 EXECUTABLE1=server
 EXECUTABLE2=client
 
 SRC1=server_main.cpp server.cpp
 SRC2=client_main.cpp client.cpp
-SRC=m_zmq.cpp socket.cpp logger.cpp message.cpp
+SRC=m_zmq.cpp socket.cpp logger.cpp message.cpp security.cpp
 
 OBJ1=$(SRC1:.cpp=.o)
 OBJ2=$(SRC2:.cpp=.o)

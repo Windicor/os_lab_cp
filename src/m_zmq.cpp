@@ -98,28 +98,50 @@ void disconnect_zmq_socket(void* socket, string endpoint) {
   }
 }
 
-void create_zmq_msg(zmq_msg_t* zmq_msg, const Message& msg) {
-  zmq_msg_init_size(zmq_msg, sizeof(Message));
-  memcpy(zmq_msg_data(zmq_msg), &msg, sizeof(Message));
+void create_zmq_msg(zmq_msg_t* zmq_msg, shared_ptr<Message> msg_ptr) {
+  switch (msg_ptr->type()) {
+    case MessageType::BASIC:
+      zmq_msg_init_size(zmq_msg, sizeof(Message));
+      *(Message*)zmq_msg_data(zmq_msg) = *(Message*)msg_ptr.get();
+      break;
+    case MessageType::TEXT:
+      zmq_msg_init_size(zmq_msg, sizeof(TextMessage));
+      *(TextMessage*)zmq_msg_data(zmq_msg) = *(TextMessage*)msg_ptr.get();
+      break;
+    default:
+      throw logic_error("Unemplemented message type");
+  }
 }
 
-void send_zmq_msg(void* socket, const Message& msg) {
+void send_zmq_msg(void* socket, shared_ptr<Message> msg_ptr) {
   zmq_msg_t zmq_msg;
-  create_zmq_msg(&zmq_msg, msg);
+  create_zmq_msg(&zmq_msg, msg_ptr);
   if (!zmq_msg_send(&zmq_msg, socket, 0)) {
     throw runtime_error("Can't send message");
   }
   zmq_msg_close(&zmq_msg);
 }
 
-Message get_zmq_msg(void* socket) {
+shared_ptr<Message> get_zmq_msg(void* socket) {
   zmq_msg_t zmq_msg;
   zmq_msg_init(&zmq_msg);
   if (zmq_msg_recv(&zmq_msg, socket, 0) == -1) {
     return Message::error_message();
   }
-  Message msg;
-  memcpy(&msg, zmq_msg_data(&zmq_msg), sizeof(Message));
+  shared_ptr<Message> msg_ptr = make_shared<Message>(*(Message*)zmq_msg_data(&zmq_msg));
+
+  switch (msg_ptr->type()) {
+    case MessageType::BASIC:
+      break;
+    case MessageType::TEXT: {
+      TextMessage* tmsg = new TextMessage(*(TextMessage*)zmq_msg_data(&zmq_msg));
+      msg_ptr = shared_ptr<Message>((Message*)tmsg);
+      break;
+    }
+    default:
+      throw logic_error("Unemplemented message type");
+  }
+
   zmq_msg_close(&zmq_msg);
-  return msg;
+  return msg_ptr;
 }
