@@ -15,6 +15,7 @@ class Client {
 
   void log(std::string message);
   void connect_to_server();
+  void disconnect_from_server();
 
   void send_text_msg(std::string message);
 

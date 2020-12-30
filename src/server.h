@@ -18,6 +18,7 @@ class Server {
 
   void log(std::string message);
   void add_connection(int id);
+  void remove_connection(int id);
 
  private:
   void* context_ = nullptr;

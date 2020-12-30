@@ -23,6 +23,9 @@ void parse_cmd(Server& server, shared_ptr<Message> msg_ptr) {
     case CommandType::CONNECT:
       server.add_connection(msg_ptr->from_id);
       break;
+    case CommandType::DISCONNECT:
+      server.remove_connection(msg_ptr->from_id);
+      break;
     case CommandType::TEXT:
       if (msg_ptr->type() != MessageType::TEXT) {
         cerr << "Text command in non text message" << endl;

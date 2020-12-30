@@ -14,9 +14,9 @@ Server::Server() {
   context_ = create_zmq_context();
 
   string endpoint = create_endpoint(EndpointType::SERVER_PUB_GENERAL);
-  general_publiser_ = make_unique<Socket>(context_, SocketType::PUBLISHER, endpoint);
+  general_publiser_ = make_unique<Socket>(context_, SocketType::PUBLISHER, move(endpoint));
   endpoint = create_endpoint(EndpointType::SERVER_SUB_GENERAL);
-  subscriber_ = make_unique<Socket>(context_, SocketType::SUBSCRIBER, endpoint);
+  subscriber_ = make_unique<Socket>(context_, SocketType::SUBSCRIBER, move(endpoint));
 }
 
 Server::~Server() {
@@ -51,9 +51,17 @@ void Server::log(std::string message) {
 void Server::add_connection(int id) {
   int new_id = id_cntr++;
   string endpoint = create_endpoint(EndpointType::SERVER_PUB, new_id);
-  id_to_publisher_[new_id] = make_unique<Socket>(context_, SocketType::PUBLISHER, endpoint);
+  id_to_publisher_[new_id] = make_unique<Socket>(context_, SocketType::PUBLISHER, move(endpoint));
   endpoint = create_endpoint(EndpointType::CLIENT_PUB, new_id);
-  subscriber_->subscribe(endpoint);
+  subscriber_->subscribe(move(endpoint));
 
+  log("Connection added");
   send(make_shared<Message>(CommandType::CONNECT, 0, id, new_id));
+}
+
+void Server::remove_connection(int id) {
+  id_to_publisher_.erase(id);
+  string endpoint = create_endpoint(EndpointType::CLIENT_PUB, id);
+  subscriber_->unsubscribe(move(endpoint));
+  log("Connection removed");
 }

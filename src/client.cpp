@@ -15,7 +15,7 @@ void* second_thread(void* cli_arg) {
   Client* client_ptr = (Client*)cli_arg;
   try {
     string endpoint = create_endpoint(EndpointType::SERVER_PUB_GENERAL);
-    client_ptr->subscriber_ = make_unique<Socket>(client_ptr->context_, SocketType::SUBSCRIBER, endpoint);
+    client_ptr->subscriber_ = make_unique<Socket>(client_ptr->context_, SocketType::SUBSCRIBER, move(endpoint));
 
     while (!client_ptr->terminated_) {
       shared_ptr<Message> msg_ptr = client_ptr->receive();
@@ -37,11 +37,11 @@ void* second_thread(void* cli_arg) {
 
           endpoint = create_endpoint(EndpointType::CLIENT_PUB, client_ptr->id());
           client_ptr->publiser_ = nullptr;
-          client_ptr->publiser_ = make_unique<Socket>(client_ptr->context_, SocketType::PUBLISHER, endpoint);
+          client_ptr->publiser_ = make_unique<Socket>(client_ptr->context_, SocketType::PUBLISHER, move(endpoint));
 
           endpoint = create_endpoint(EndpointType::SERVER_PUB, client_ptr->id());
           client_ptr->subscriber_ = nullptr;
-          client_ptr->subscriber_ = make_unique<Socket>(client_ptr->context_, SocketType::SUBSCRIBER, endpoint);
+          client_ptr->subscriber_ = make_unique<Socket>(client_ptr->context_, SocketType::SUBSCRIBER, move(endpoint));
           break;
 
         default:
@@ -57,29 +57,23 @@ void* second_thread(void* cli_arg) {
   return NULL;
 }
 
-void Client::connect_to_server() {
-  while (!server_is_avaible_) {
-    cout << "Trying to connect to the server..." << endl;
-    send(Message::connect_message(id_));
-    sleep(MESSAGE_WAITING_TIME);
-  }
-  cout << "Connected to server" << endl;
-}
-
 Client::Client() {
   log("Starting client...");
   context_ = create_zmq_context();
 
   string endpoint = create_endpoint(EndpointType::SERVER_SUB_GENERAL);
-  publiser_ = make_unique<Socket>(context_, SocketType::PUBLISHER, endpoint);
+  publiser_ = make_unique<Socket>(context_, SocketType::PUBLISHER, move(endpoint));
 
   if (pthread_create(&second_thread_id_, 0, second_thread, this) != 0) {
     cout << "Can't run second thread" << endl;
     exit(ERR_LOOP);
   }
 
+  log("Client is started correctly");
+
   srand(time(NULL) + clock());
   id_ = rand();
+  connect_to_server();
 }
 
 Client::~Client() {
@@ -87,7 +81,7 @@ Client::~Client() {
     log("Client double termination");
     return;
   }
-
+  disconnect_from_server();
   log("Destroying client...");
   terminated_ = true;
 
@@ -116,6 +110,20 @@ shared_ptr<Message> Client::receive() {
 
 void Client::log(string message) {
   logger_.log(move(message));
+}
+
+void Client::connect_to_server() {
+  while (!server_is_avaible_) {
+    cout << "Trying to connect to the server..." << endl;
+    send(Message::connect_message(id_));
+    sleep(MESSAGE_WAITING_TIME);
+  }
+  cout << "Connected to server" << endl;
+}
+
+void Client::disconnect_from_server() {
+  cout << "Disconnecting from the server..." << endl;
+  send(Message::disconnect_message(id_));
 }
 
 void Client::send_text_msg(string message) {

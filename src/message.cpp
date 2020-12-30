@@ -23,6 +23,9 @@ shared_ptr<Message> Message::error_message() {
 shared_ptr<Message> Message::connect_message(int id) {
   return make_shared<Message>(CommandType::CONNECT, id, 0, 0);
 }
+shared_ptr<Message> Message::disconnect_message(int id) {
+  return make_shared<Message>(CommandType::DISCONNECT, id, 0, 0);
+}
 
 TextMessage::TextMessage() {
   type_ = MessageType::TEXT;
