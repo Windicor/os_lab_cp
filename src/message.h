@@ -37,7 +37,7 @@ class Message {
   static std::shared_ptr<Message> connect_message(int id);
 };
 
-class TextMessage : Message {
+class TextMessage : public Message {
  protected:
   static const size_t MAX_MESSAGE_SIZE = 1024;
 

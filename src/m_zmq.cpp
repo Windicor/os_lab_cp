@@ -134,8 +134,7 @@ shared_ptr<Message> get_zmq_msg(void* socket) {
     case MessageType::BASIC:
       break;
     case MessageType::TEXT: {
-      TextMessage* tmsg = new TextMessage(*(TextMessage*)zmq_msg_data(&zmq_msg));
-      msg_ptr = shared_ptr<Message>((Message*)tmsg);
+      msg_ptr = make_shared<TextMessage>(*(TextMessage*)zmq_msg_data(&zmq_msg));
       break;
     }
     default:

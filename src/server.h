@@ -13,8 +13,8 @@ class Server {
   Server();
   ~Server();
 
-  void send(const Message& message);
-  Message receive();
+  void send(std::shared_ptr<Message> message);
+  std::shared_ptr<Message> receive();
 
   void log(std::string message);
   void add_connection(int id);

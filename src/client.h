@@ -16,6 +16,8 @@ class Client {
   void log(std::string message);
   void connect_to_server();
 
+  void send_text_msg(std::string message);
+
   int id() const;
 
   friend void* second_thread(void* cli_arg);

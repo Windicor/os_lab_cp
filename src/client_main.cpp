@@ -35,8 +35,8 @@ int main() {
     client.connect_to_server();
 
     string text;
-    while (cin >> text) {
-      //client.send(Message::connect_message());
+    while (getline(cin, text)) {
+      client.send_text_msg(move(text));
     }
 
   } catch (exception& ex) {

@@ -18,6 +18,23 @@ void TerminateByUser(int) {
   exit(0);
 }
 
+void parse_cmd(Server& server, shared_ptr<Message> msg_ptr) {
+  switch (msg_ptr->command) {
+    case CommandType::CONNECT:
+      server.add_connection(msg_ptr->from_id);
+      break;
+    case CommandType::TEXT:
+      if (msg_ptr->type() != MessageType::TEXT) {
+        cerr << "Text command in non text message" << endl;
+        break;
+      }
+      cout << "Text: \"" << ((TextMessage*)msg_ptr.get())->text << "\"" << endl;
+      break;
+    default:
+      throw logic_error("Unimplemented command type");
+  }
+}
+
 int main() {
   try {
     if (signal(SIGINT, TerminateByUser) == SIG_ERR) {
@@ -32,10 +49,8 @@ int main() {
     server.log("Server is started correctly");
 
     while (true) {
-      Message msg = server.receive();
-      if (msg.command == CommandType::CONNECT) {
-        server.add_connection(msg.from_id);
-      }
+      shared_ptr<Message> msg_ptr = server.receive();
+      parse_cmd(server, msg_ptr);
     }
   } catch (exception& ex) {
     cerr << ("Server exception: "s + ex.what() + "\nServer is terminated by exception");

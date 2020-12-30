@@ -18,21 +18,21 @@ void* second_thread(void* cli_arg) {
     client_ptr->subscriber_ = make_unique<Socket>(client_ptr->context_, SocketType::SUBSCRIBER, endpoint);
 
     while (true) {
-      Message msg = client_ptr->receive();
-      if (msg.command == CommandType::ERROR) {
+      shared_ptr<Message> msg_ptr = client_ptr->receive();
+      if (msg_ptr->command == CommandType::ERROR) {
         if (client_ptr->terminated_) {
           return NULL;
         } else {
           throw runtime_error("Can't receive message");
         }
       }
-      if (msg.to_id != client_ptr->id()) {
+      if (msg_ptr->to_id != client_ptr->id()) {
         continue;
       }
-      client_ptr->log("Message received by client: "s + msg.get_stats());
-      switch (msg.command) {
+      client_ptr->log("Message received by client: "s + msg_ptr->get_stats());
+      switch (msg_ptr->command) {
         case CommandType::CONNECT:
-          client_ptr->id_ = msg.value;
+          client_ptr->id_ = msg_ptr->value;
           client_ptr->server_is_avaible_ = true;
 
           endpoint = create_endpoint(EndpointType::CLIENT_PUB, client_ptr->id());
@@ -104,15 +104,19 @@ int Client::id() const {
   return id_;
 }
 
-void Client::send(const Message& message) {
+void Client::send(shared_ptr<Message> message) {
   publiser_->send(message);
-  log("Message sended from client: "s + message.get_stats());
+  log("Message sended from client: "s + message->get_stats());
 }
 
-Message Client::receive() {
+shared_ptr<Message> Client::receive() {
   return subscriber_->receive();
 }
 
 void Client::log(string message) {
   logger_.log(move(message));
+}
+
+void Client::send_text_msg(string message) {
+  send(make_shared<TextMessage>(CommandType::TEXT, id_, 0, move(message)));
 }

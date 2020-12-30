@@ -14,8 +14,8 @@ class Socket {
   Socket(void* context, SocketType socket_type, std::string endpoint);
   ~Socket();
 
-  void send(const Message& message);
-  Message receive();
+  void send(std::shared_ptr<Message> message);
+  std::shared_ptr<Message> receive();
 
   void subscribe(std::string endpoint);
   void unsubscribe(std::string endpoint);

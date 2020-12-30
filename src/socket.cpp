@@ -28,7 +28,7 @@ Socket::~Socket() {
   }
 }
 
-void Socket::send(const Message& message) {
+void Socket::send(shared_ptr<Message> message) {
   if (socket_type_ == SocketType::PUBLISHER) {
     send_zmq_msg(socket_, message);
   } else {
@@ -36,7 +36,7 @@ void Socket::send(const Message& message) {
   }
 }
 
-Message Socket::receive() {
+shared_ptr<Message> Socket::receive() {
   if (socket_type_ == SocketType::SUBSCRIBER) {
     return get_zmq_msg(socket_);
   } else {

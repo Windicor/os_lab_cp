@@ -33,14 +33,14 @@ Server::~Server() {
   }
 }
 
-void Server::send(const Message& message) {
+void Server::send(shared_ptr<Message> message) {
   general_publiser_->send(message);
-  log("Message sended from server: "s + message.get_stats());
+  log("Message sended from server: "s + message->get_stats());
 }
 
-Message Server::receive() {
-  Message message = subscriber_->receive();
-  log("Message received by server: "s + message.get_stats());
+shared_ptr<Message> Server::receive() {
+  shared_ptr<Message> message = subscriber_->receive();
+  log("Message received by server: "s + message->get_stats());
   return message;
 }
 
@@ -55,5 +55,5 @@ void Server::add_connection(int id) {
   endpoint = create_endpoint(EndpointType::CLIENT_PUB, new_id);
   subscriber_->subscribe(endpoint);
 
-  send(Message(CommandType::CONNECT, 0, id, new_id));
+  send(make_shared<Message>(CommandType::CONNECT, 0, id, new_id));
 }
