@@ -13,5 +13,5 @@ class Logger {
   void log(std::string message);
 
  private:
-  std::optional<std::ofstream> fout;
+  std::optional<std::ofstream> fout_opt;
 };

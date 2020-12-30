@@ -28,10 +28,17 @@ void parse_cmd(Server& server, shared_ptr<Message> msg_ptr) {
       break;
     case CommandType::TEXT:
       if (msg_ptr->type() != MessageType::TEXT) {
-        cerr << "Text command in non text message" << endl;
+        server.log("Text command in non text message");
         break;
       }
       cout << "Text: \"" << ((TextMessage*)msg_ptr.get())->text << "\"" << endl;
+      break;
+    case CommandType::REGISTER:
+      if (msg_ptr->type() != MessageType::TEXT) {
+        server.log("Register command in non text message");
+        break;
+      }
+      server.register_form(msg_ptr);
       break;
     default:
       throw logic_error("Unimplemented command type");

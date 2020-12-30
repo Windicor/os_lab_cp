@@ -12,7 +12,8 @@ enum class CommandType {
   ERROR,
   CONNECT,
   DISCONNECT,
-  TEXT
+  TEXT,
+  REGISTER
 };
 
 class Message {

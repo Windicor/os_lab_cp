@@ -30,6 +30,10 @@ int main() {
 
     Client client;
     client_ptr = &client;
+    client.log("Client is started correctly");
+
+    client.connect_to_server();
+    client.enter();
 
     string text;
     while (getline(cin, text)) {

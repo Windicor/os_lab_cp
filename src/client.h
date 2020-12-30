@@ -17,6 +17,10 @@ class Client {
   void connect_to_server();
   void disconnect_from_server();
 
+  void enter();
+  void register_form();
+  void login_form();
+
   void send_text_msg(std::string message);
 
   int id() const;
@@ -34,6 +38,13 @@ class Client {
 
   bool terminated_ = false;
   Logger logger_ = Logger(/*"log.txt"*/);
+
+  enum class Status {
+    UNLOGGED,
+    LOGGED,
+    LOG_ERROR
+  };
+  Status status_ = Status::UNLOGGED;
 
   void send(std::shared_ptr<Message> message);
   std::shared_ptr<Message> receive();
