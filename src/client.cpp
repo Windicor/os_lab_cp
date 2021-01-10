@@ -63,10 +63,11 @@ void* second_thread(void* cli_arg) {
           break;
         case CommandType::LEFT_CHAT:
           cout << "Companion left the chat" << endl;
+          cout << "Enter your companion username" << endl;
           client_ptr->status = Client::Status::LOGGED;
           break;
         case CommandType::TEXT:
-          cout << ((TextMessage*)msg_ptr.get())->text << endl;
+          cout << ">" << ((TextMessage*)msg_ptr.get())->text << endl;
           break;
         default:
           throw logic_error("Undefined command type");
@@ -205,12 +206,7 @@ void Client::send_text_msg(string message) {
   }
 }
 
-void Client::enter_chat() {
-  cout << "Enter your companion username" << endl;
-  string uname;
-  if (cin >> uname) {
-    if (status != Client::Status::IN_CHAT) {
-      send(make_shared<TextMessage>(CommandType::CREATE_CHAT, id_, 0, move(uname)));
-    }
-  }
+void Client::enter_chat(string uname) {
+  cout << "Trying to create chat whith " << uname << "..." << endl;
+  send(make_shared<TextMessage>(CommandType::CREATE_CHAT, id_, 0, move(uname)));
 }

@@ -35,6 +35,7 @@ int main() {
     client.connect_to_server();
     client.enter_in_system();
 
+    cout << "Enter your companion username" << endl;
     string text;
     while (getline(cin, text)) {
       if (text == "") {
@@ -43,7 +44,7 @@ int main() {
       if (client.status == Client::Status::IN_CHAT) {
         client.send_text_msg(move(text));
       } else {
-        client.enter_chat();
+        client.enter_chat(move(text));
       }
     }
 

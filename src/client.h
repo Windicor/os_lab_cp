@@ -22,7 +22,7 @@ class Client {
   void login_form();
 
   void send_text_msg(std::string message);
-  void enter_chat();
+  void enter_chat(std::string uname);
 
   int id() const;
 
