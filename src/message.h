@@ -45,10 +45,9 @@ class Message {
 };
 
 class TextMessage : public Message {
- protected:
+ public:
   static const size_t MAX_MESSAGE_SIZE = 1024;
 
- public:
   char text[MAX_MESSAGE_SIZE + 1];
 
   TextMessage();

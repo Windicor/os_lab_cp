@@ -45,6 +45,10 @@ int main() {
         if (text == "\\exit") {
           client.left_chat();
         } else {
+          if (text.size() > TextMessage::MAX_MESSAGE_SIZE) {
+            cout << "Too long message" << endl;
+            continue;
+          }
           client.send_text_msg(move(text));
         }
       } else {
