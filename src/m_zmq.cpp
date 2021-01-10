@@ -62,13 +62,13 @@ void close_zmq_socket(void* socket) {
 string create_endpoint(EndpointType type, int id) {
   switch (type) {
     case EndpointType::SERVER_PUB_GENERAL:
-      return "ipc://tmp/server_pub_general"s;
+      return ENDPOINT_PROTOCOL + ENDPOINT_FOLDER + "server_pub_general"s;
     case EndpointType::SERVER_SUB_GENERAL:
-      return "ipc://tmp/server_sub_general"s;
+      return ENDPOINT_PROTOCOL + ENDPOINT_FOLDER + "server_sub_general"s;
     case EndpointType::SERVER_PUB:
-      return "ipc://tmp/server_pub_"s + to_string(id);
+      return ENDPOINT_PROTOCOL + ENDPOINT_FOLDER + "server_pub_"s + to_string(id);
     case EndpointType::CLIENT_PUB:
-      return "ipc://tmp/client_pub_"s + to_string(id);
+      return ENDPOINT_PROTOCOL + ENDPOINT_FOLDER + "client_pub_"s + to_string(id);
     default:
       throw logic_error("Undefined endpoint type");
   }

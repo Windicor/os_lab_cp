@@ -15,6 +15,8 @@ enum class SocketType {
 void* create_zmq_socket(void* context, SocketType type);
 void close_zmq_socket(void* socket);
 
+const std::string ENDPOINT_PROTOCOL = "ipc://";
+const std::string ENDPOINT_FOLDER = "tmp/";
 enum class EndpointType {
   SERVER_PUB_GENERAL,
   SERVER_SUB_GENERAL,

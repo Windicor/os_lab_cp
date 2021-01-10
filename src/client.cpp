@@ -2,6 +2,7 @@
 
 #include <cstdlib>
 #include <ctime>
+#include <filesystem>
 #include <iostream>
 
 #include "m_zmq.h"
@@ -85,6 +86,10 @@ void* second_thread(void* cli_arg) {
 Client::Client() {
   log("Starting client...");
   context_ = create_zmq_context();
+
+  if (!filesystem::exists(ENDPOINT_FOLDER)) {
+    filesystem::create_directory(ENDPOINT_FOLDER);
+  }
 
   string endpoint = create_endpoint(EndpointType::SERVER_SUB_GENERAL);
   publiser_ = make_unique<Socket>(context_, SocketType::PUBLISHER, move(endpoint));

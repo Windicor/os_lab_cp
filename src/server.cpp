@@ -3,6 +3,7 @@
 #include <pthread.h>
 #include <signal.h>
 
+#include <filesystem>
 #include <iostream>
 #include <sstream>
 
@@ -74,6 +75,10 @@ bool Rooms::check_companion(int id) const {
 Server::Server() {
   log("Starting server...");
   context_ = create_zmq_context();
+
+  if (!filesystem::exists(ENDPOINT_FOLDER)) {
+    filesystem::create_directory(ENDPOINT_FOLDER);
+  }
 
   string endpoint = create_endpoint(EndpointType::SERVER_PUB_GENERAL);
   general_publiser_ = make_unique<Socket>(context_, SocketType::PUBLISHER, move(endpoint));
