@@ -23,6 +23,7 @@ class Client {
 
   void send_text_msg(std::string message);
   void enter_chat(std::string uname);
+  void left_chat();
 
   int id() const;
 

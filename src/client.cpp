@@ -210,3 +210,10 @@ void Client::enter_chat(string uname) {
   cout << "Trying to create chat whith " << uname << "..." << endl;
   send(make_shared<TextMessage>(CommandType::CREATE_CHAT, id_, 0, move(uname)));
 }
+
+void Client::left_chat() {
+  cout << "Exiting from chat..." << endl;
+  send(Message::left_chat_message(id_));
+  status = Client::Status::LOGGED;
+  cout << "Enter your companion username" << endl;
+}

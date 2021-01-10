@@ -42,7 +42,11 @@ int main() {
         continue;
       }
       if (client.status == Client::Status::IN_CHAT) {
-        client.send_text_msg(move(text));
+        if (text == "\\exit") {
+          client.left_chat();
+        } else {
+          client.send_text_msg(move(text));
+        }
       } else {
         client.enter_chat(move(text));
       }

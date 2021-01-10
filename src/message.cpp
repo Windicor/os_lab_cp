@@ -26,6 +26,9 @@ shared_ptr<Message> Message::connect_message(int id) {
 shared_ptr<Message> Message::disconnect_message(int id) {
   return make_shared<Message>(CommandType::DISCONNECT, id, 0, 0);
 }
+shared_ptr<Message> Message::left_chat_message(int id) {
+  return make_shared<Message>(CommandType::LEFT_CHAT, id, 0, 0);
+}
 
 TextMessage::TextMessage() {
   type_ = MessageType::TEXT;

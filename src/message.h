@@ -41,6 +41,7 @@ class Message {
   static std::shared_ptr<Message> error_message();
   static std::shared_ptr<Message> connect_message(int id);
   static std::shared_ptr<Message> disconnect_message(int id);
+  static std::shared_ptr<Message> left_chat_message(int id);
 };
 
 class TextMessage : public Message {
