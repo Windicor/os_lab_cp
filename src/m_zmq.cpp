@@ -140,10 +140,9 @@ shared_ptr<Message> get_zmq_msg(void* socket) {
     case MessageType::TEXT:
       msg_ptr = make_shared<TextMessage>(*(TextMessage*)zmq_msg_data(&zmq_msg));
       break;
-    case MessageType::FILE: {
+    case MessageType::FILE:
       msg_ptr = make_shared<FileMessage>(*(FileMessage*)zmq_msg_data(&zmq_msg));
       break;
-    }
     default:
       throw logic_error("Unemplemented message type");
   }
