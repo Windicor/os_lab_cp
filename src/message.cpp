@@ -34,11 +34,21 @@ TextMessage::TextMessage() {
   type_ = MessageType::TEXT;
   text[0] = '\0';
 }
-TextMessage::TextMessage(CommandType command, int from_id, int to_id, string text_str, int value)
+TextMessage::TextMessage(CommandType command, int from_id, int to_id, const string& text_str, int value)
     : Message(command, from_id, to_id, value) {
   type_ = MessageType::TEXT;
   if (text_str.size() > MAX_MESSAGE_SIZE) {
     throw logic_error("Message text can't be longer, than MAX_MESSAGE_SIZE");
   }
   memcpy(text, text_str.data(), text_str.size() + 1);
+}
+
+FileMessage::FileMessage(CommandType command, int from_id, int to_id, int packages_left, const vector<uint8_t>& buf_vec, size_t size)
+    : Message(command, from_id, to_id, packages_left) {
+  type_ = MessageType::FILE;
+  if (size > BUF_SIZE) {
+    throw logic_error("File message size cannot be more than BUF_SIZE");
+  }
+  this->size = size;
+  memcpy(buf, buf_vec.data(), size);
 }

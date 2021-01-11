@@ -108,6 +108,10 @@ void create_zmq_msg(zmq_msg_t* zmq_msg, shared_ptr<Message> msg_ptr) {
       zmq_msg_init_size(zmq_msg, sizeof(TextMessage));
       *(TextMessage*)zmq_msg_data(zmq_msg) = *(TextMessage*)msg_ptr.get();
       break;
+    case MessageType::FILE:
+      zmq_msg_init_size(zmq_msg, sizeof(FileMessage));
+      *(FileMessage*)zmq_msg_data(zmq_msg) = *(FileMessage*)msg_ptr.get();
+      break;
     default:
       throw logic_error("Unemplemented message type");
   }
@@ -133,10 +137,12 @@ shared_ptr<Message> get_zmq_msg(void* socket) {
   switch (msg_ptr->type()) {
     case MessageType::BASIC:
       break;
-    case MessageType::TEXT: {
+    case MessageType::TEXT:
       msg_ptr = make_shared<TextMessage>(*(TextMessage*)zmq_msg_data(&zmq_msg));
       break;
-    }
+    case MessageType::FILE:
+      msg_ptr = make_shared<FileMessage>(*(FileMessage*)zmq_msg_data(&zmq_msg));
+      break;
     default:
       throw logic_error("Unemplemented message type");
   }

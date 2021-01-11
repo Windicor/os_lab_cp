@@ -1,11 +1,14 @@
 #pragma once
 
+#include <cstdint>
 #include <memory>
 #include <string>
+#include <vector>
 
 enum class MessageType {
   BASIC,
-  TEXT
+  TEXT,
+  FILE
 };
 
 enum class CommandType {
@@ -16,7 +19,9 @@ enum class CommandType {
   REGISTER,
   LOGIN,
   CREATE_CHAT,
-  LEFT_CHAT
+  LEFT_CHAT,
+  FILE_NAME,
+  FILE_PART
 };
 
 class Message {
@@ -51,5 +56,15 @@ class TextMessage : public Message {
   char text[MAX_MESSAGE_SIZE + 1];
 
   TextMessage();
-  TextMessage(CommandType command, int from_id, int to_id, std::string text, int value = 0);
+  TextMessage(CommandType command, int from_id, int to_id, const std::string& text, int value = 0);
+};
+
+class FileMessage : public Message {
+ public:
+  static const size_t BUF_SIZE = 1024;
+
+  uint8_t buf[BUF_SIZE];
+  size_t size;
+
+  FileMessage(CommandType command, int from_id, int to_id, int packages_left, const std::vector<uint8_t>& buf_vec, size_t size = BUF_SIZE);
 };

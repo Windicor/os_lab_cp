@@ -1,6 +1,7 @@
 #include <signal.h>
 
 #include <iostream>
+#include <sstream>
 #include <string>
 
 #include "client.h"
@@ -18,6 +19,9 @@ void TerminateByUser(int) {
   }
   exit(0);
 }
+
+const string EXIT_COMMAND = "\\exit";
+const string FILE_COMMAND = "\\file";
 
 int main() {
   try {
@@ -41,14 +45,17 @@ int main() {
       if (text == "") {
         continue;
       }
+      if (text.size() > TextMessage::MAX_MESSAGE_SIZE) {
+        cout << "Too long message" << endl;
+        continue;
+      }
+
       if (client.status == Client::Status::IN_CHAT) {
-        if (text == "\\exit") {
+        if (text == EXIT_COMMAND) {
           client.left_chat();
+        } else if (text.size() > FILE_COMMAND.size() + 1 && text.substr(0, FILE_COMMAND.size()) == FILE_COMMAND && text[FILE_COMMAND.size()] == ' ') {
+          client.send_file_msg(text.substr(FILE_COMMAND.size() + 1));
         } else {
-          if (text.size() > TextMessage::MAX_MESSAGE_SIZE) {
-            cout << "Too long message" << endl;
-            continue;
-          }
           client.send_text_msg(move(text));
         }
       } else {

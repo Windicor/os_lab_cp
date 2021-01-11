@@ -70,6 +70,9 @@ void* second_thread(void* cli_arg) {
         case CommandType::TEXT:
           cout << ">" << ((TextMessage*)msg_ptr.get())->text << endl;
           break;
+        case CommandType::FILE_NAME:
+          cout << "Filename: " << ((TextMessage*)msg_ptr.get())->text << endl;
+          break;
         default:
           throw logic_error("Undefined command type");
           break;
@@ -206,9 +209,15 @@ void Client::enter_in_system() {
 }
 
 void Client::send_text_msg(string message) {
-  if (message != "") {
-    send(make_shared<TextMessage>(CommandType::TEXT, id_, 0, move(message)));
-  }
+  send(make_shared<TextMessage>(CommandType::TEXT, id_, 0, move(message)));
+}
+
+void Client::send_file_part_msg(vector<uint8_t> file_part, size_t size, int packages_left) {
+  send(make_shared<FileMessage>(CommandType::FILE_PART, id_, 0, packages_left, move(file_part), size));
+}
+
+void Client::send_file_msg(string filename) {
+  send(make_shared<TextMessage>(CommandType::FILE_NAME, id_, 0, filename));
 }
 
 void Client::enter_chat(string uname) {

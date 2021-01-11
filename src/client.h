@@ -2,8 +2,10 @@
 
 #include <unistd.h>
 
+#include <cstdint>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "logger.h"
 #include "socket.h"
@@ -22,6 +24,7 @@ class Client {
   void login_form();
 
   void send_text_msg(std::string message);
+  void send_file_msg(std::string filename);
   void enter_chat(std::string uname);
   void left_chat();
 
@@ -51,4 +54,5 @@ class Client {
 
   void send(std::shared_ptr<Message> message);
   std::shared_ptr<Message> receive();
+  void send_file_part_msg(std::vector<uint8_t> file_part, size_t size, int packages_left);
 };

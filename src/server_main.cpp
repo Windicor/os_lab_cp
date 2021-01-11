@@ -58,6 +58,13 @@ void parse_cmd(Server& server, shared_ptr<Message> msg_ptr) {
     case CommandType::LEFT_CHAT:
       server.exit_room(msg_ptr->from_id);
       break;
+    case CommandType::FILE_NAME:
+      if (msg_ptr->type() != MessageType::TEXT) {
+        server.log("FileName command in non text message");
+        break;
+      }
+      server.send_from_user_to_user(msg_ptr->from_id, msg_ptr);
+      break;
     default:
       throw logic_error("Unimplemented command type");
   }
