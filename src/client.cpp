@@ -79,6 +79,9 @@ void* second_thread(void* cli_arg) {
           string name = ((TextMessage*)msg_ptr.get())->text;
           cout << "Filename: " << name << endl;
           client_ptr->fout.open(FILES_FOLDER + name, ios::binary);
+          if (!client_ptr->fout.is_open()) {
+            throw runtime_error("Cannot open a file");
+          }
           break;
         }
         case CommandType::FILE_PART: {
@@ -244,6 +247,10 @@ void Client::send_file_msg(filesystem::path path) {
   }
   send(make_shared<TextMessage>(CommandType::FILE_NAME, id_, 0, path.filename()));
   fin.open(path, ios::binary);
+  if (!fin.is_open()) {
+    cout << "Cannot open a file" << endl;
+    return;
+  }
   vector<uint8_t> vec(FileMessage::BUF_SIZE);
   size_t file_size = filesystem::file_size(path);
   while (fin) {
