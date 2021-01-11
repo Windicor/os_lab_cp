@@ -43,12 +43,12 @@ TextMessage::TextMessage(CommandType command, int from_id, int to_id, const stri
   memcpy(text, text_str.data(), text_str.size() + 1);
 }
 
-FileMessage::FileMessage(CommandType command, int from_id, int to_id, int packages_left, const vector<uint8_t>& buf_vec, size_t size)
-    : Message(command, from_id, to_id, packages_left) {
+FileMessage::FileMessage(CommandType command, int from_id, int to_id, int value, const vector<uint8_t>& buf_vec)
+    : Message(command, from_id, to_id, value) {
   type_ = MessageType::FILE;
-  if (size > BUF_SIZE) {
+  if (buf_vec.size() > BUF_SIZE) {
     throw logic_error("File message size cannot be more than BUF_SIZE");
   }
-  this->size = size;
-  memcpy(buf, buf_vec.data(), size);
+  size = buf_vec.size();
+  memcpy(buf, buf_vec.data(), buf_vec.size());
 }

@@ -133,6 +133,9 @@ shared_ptr<Message> Server::receive() {
   if (message->type() == MessageType::TEXT) {
     log("Text: \""s + string(((TextMessage*)message.get())->text) + "\""s);
   }
+  if (message->type() == MessageType::FILE) {
+    log("Package size: "s + to_string(((FileMessage*)message.get())->size));
+  }
   return message;
 }
 

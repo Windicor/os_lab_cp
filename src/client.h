@@ -3,6 +3,7 @@
 #include <unistd.h>
 
 #include <cstdint>
+#include <filesystem>
 #include <memory>
 #include <string>
 #include <vector>
@@ -24,9 +25,9 @@ class Client {
   void login_form();
 
   void send_text_msg(std::string message);
-  void send_file_msg(std::string filename);
+  void send_file_msg(std::filesystem::path path);
   void enter_chat(std::string uname);
-  void left_chat();
+  void leave_chat();
 
   int id() const;
 
@@ -54,5 +55,9 @@ class Client {
 
   void send(std::shared_ptr<Message> message);
   std::shared_ptr<Message> receive();
-  void send_file_part_msg(std::vector<uint8_t> file_part, size_t size, int packages_left);
+  void send_file_part_msg(const std::vector<uint8_t>& file_part, int value);
+
+  void leave_chat_actions();
+  std::ifstream fin;
+  std::ofstream fout;
 };

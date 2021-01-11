@@ -65,6 +65,13 @@ void parse_cmd(Server& server, shared_ptr<Message> msg_ptr) {
       }
       server.send_from_user_to_user(msg_ptr->from_id, msg_ptr);
       break;
+    case CommandType::FILE_PART:
+      if (msg_ptr->type() != MessageType::FILE) {
+        server.log("FilePart command in non file message");
+        break;
+      }
+      server.send_from_user_to_user(msg_ptr->from_id, msg_ptr);
+      break;
     default:
       throw logic_error("Unimplemented command type");
   }

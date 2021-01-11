@@ -2,7 +2,7 @@
 
 #include <cstdlib>
 #include <ctime>
-#include <filesystem>
+#include <fstream>
 #include <iostream>
 
 #include "m_zmq.h"
@@ -12,6 +12,8 @@ using namespace std;
 
 const int ERR_LOOP = 2;
 const int MESSAGE_WAITING_TIME = 1;
+
+const string FILES_FOLDER = "files/";
 
 void* second_thread(void* cli_arg) {
   Client* client_ptr = (Client*)cli_arg;
@@ -65,14 +67,29 @@ void* second_thread(void* cli_arg) {
         case CommandType::LEFT_CHAT:
           cout << "Companion left the chat" << endl;
           cout << "Enter your companion username" << endl;
-          client_ptr->status = Client::Status::LOGGED;
+          client_ptr->leave_chat_actions();
           break;
         case CommandType::TEXT:
           cout << ">" << ((TextMessage*)msg_ptr.get())->text << endl;
           break;
-        case CommandType::FILE_NAME:
-          cout << "Filename: " << ((TextMessage*)msg_ptr.get())->text << endl;
+        case CommandType::FILE_NAME: {
+          if (!filesystem::exists(FILES_FOLDER)) {
+            filesystem::create_directory(FILES_FOLDER);
+          }
+          string name = ((TextMessage*)msg_ptr.get())->text;
+          cout << "Filename: " << name << endl;
+          client_ptr->fout.open(FILES_FOLDER + name, ios::binary);
           break;
+        }
+        case CommandType::FILE_PART: {
+          FileMessage& file_msg = *(FileMessage*)msg_ptr.get();
+          client_ptr->fout.write(reinterpret_cast<char*>(file_msg.buf), file_msg.size);
+          if (file_msg.value == FileMessage::LAST_PART) {
+            client_ptr->fout.close();
+            cout << "File is received" << endl;
+          }
+          break;
+        }
         default:
           throw logic_error("Undefined command type");
           break;
@@ -81,6 +98,7 @@ void* second_thread(void* cli_arg) {
 
   } catch (exception& ex) {
     client_ptr->log("Client exctption: "s + ex.what() + "\nTerminated by exception on client receive loop"s);
+    cout << "Terminated by error on loop" << endl;
     exit(ERR_LOOP);
   }
   return NULL;
@@ -156,6 +174,7 @@ void Client::disconnect_from_server() {
   send(Message::disconnect_message(id_));
 }
 
+const int LOGIN_CHECK_COUNT = 5;
 void Client::login_form() {
   cout << "Enter login and password" << endl;
   string uname, log, pas;
@@ -164,11 +183,12 @@ void Client::login_form() {
   }
   status = Client::Status::UNLOGGED;
   send(make_shared<TextMessage>(CommandType::LOGIN, id_, 0, md5sum(log) + " "s + md5sum(pas)));
-  while (status == Client::Status::UNLOGGED) {
+  int cnt = LOGIN_CHECK_COUNT;
+  while (cnt-- > 0 && status == Client::Status::UNLOGGED) {
     cout << "Checking..." << endl;
     sleep(1);
   }
-  if (status == Client::Status::LOG_ERROR) {
+  if (status == Client::Status::LOG_ERROR || status == Client::Status::UNLOGGED) {
     cout << "Please, try again" << endl;
   }
 }
@@ -181,11 +201,12 @@ void Client::register_form() {
   }
   status = Client::Status::UNLOGGED;
   send(make_shared<TextMessage>(CommandType::REGISTER, id_, 0, uname + " "s + md5sum(log) + " "s + md5sum(pas)));
-  while (status == Client::Status::UNLOGGED) {
+  int cnt = LOGIN_CHECK_COUNT;
+  while (cnt-- > 0 && status == Client::Status::UNLOGGED) {
     cout << "Checking..." << endl;
     sleep(1);
   }
-  if (status == Client::Status::LOG_ERROR) {
+  if (status == Client::Status::LOG_ERROR || status == Client::Status::UNLOGGED) {
     cout << "Please, try again" << endl;
   }
 }
@@ -212,12 +233,31 @@ void Client::send_text_msg(string message) {
   send(make_shared<TextMessage>(CommandType::TEXT, id_, 0, move(message)));
 }
 
-void Client::send_file_part_msg(vector<uint8_t> file_part, size_t size, int packages_left) {
-  send(make_shared<FileMessage>(CommandType::FILE_PART, id_, 0, packages_left, move(file_part), size));
+void Client::send_file_part_msg(const vector<uint8_t>& file_part, int value) {
+  send(make_shared<FileMessage>(CommandType::FILE_PART, id_, 0, value, move(file_part)));
 }
 
-void Client::send_file_msg(string filename) {
-  send(make_shared<TextMessage>(CommandType::FILE_NAME, id_, 0, filename));
+void Client::send_file_msg(filesystem::path path) {
+  if (!filesystem::is_regular_file(path)) {
+    cout << "No such file" << endl;
+    return;
+  }
+  send(make_shared<TextMessage>(CommandType::FILE_NAME, id_, 0, path.filename()));
+  fin.open(path, ios::binary);
+  vector<uint8_t> vec(FileMessage::BUF_SIZE);
+  size_t file_size = filesystem::file_size(path);
+  while (fin) {
+    fin.read(reinterpret_cast<char*>(vec.data()), FileMessage::BUF_SIZE);
+    vec.resize(fin.gcount());
+
+    if (fin) {
+      send_file_part_msg(vec, FileMessage::COMMON_PART);
+    } else {
+      send_file_part_msg(vec, FileMessage::LAST_PART);
+    }
+  }
+  fin.close();
+  cout << "File is sent" << endl;
 }
 
 void Client::enter_chat(string uname) {
@@ -225,9 +265,13 @@ void Client::enter_chat(string uname) {
   send(make_shared<TextMessage>(CommandType::CREATE_CHAT, id_, 0, move(uname)));
 }
 
-void Client::left_chat() {
+void Client::leave_chat_actions() {
+  status = Client::Status::LOGGED;
+}
+
+void Client::leave_chat() {
   cout << "Exiting from chat..." << endl;
   send(Message::left_chat_message(id_));
-  status = Client::Status::LOGGED;
+  leave_chat_actions();
   cout << "Enter your companion username" << endl;
 }

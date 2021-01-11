@@ -52,7 +52,7 @@ int main() {
 
       if (client.status == Client::Status::IN_CHAT) {
         if (text == EXIT_COMMAND) {
-          client.left_chat();
+          client.leave_chat();
         } else if (text.size() > FILE_COMMAND.size() + 1 && text.substr(0, FILE_COMMAND.size()) == FILE_COMMAND && text[FILE_COMMAND.size()] == ' ') {
           client.send_file_msg(text.substr(FILE_COMMAND.size() + 1));
         } else {

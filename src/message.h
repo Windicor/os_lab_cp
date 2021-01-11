@@ -61,10 +61,13 @@ class TextMessage : public Message {
 
 class FileMessage : public Message {
  public:
-  static const size_t BUF_SIZE = 1024;
+  static const int COMMON_PART = 0;
+  static const int LAST_PART = 1;
+
+  static const size_t BUF_SIZE = 1000000;
 
   uint8_t buf[BUF_SIZE];
   size_t size;
 
-  FileMessage(CommandType command, int from_id, int to_id, int packages_left, const std::vector<uint8_t>& buf_vec, size_t size = BUF_SIZE);
+  FileMessage(CommandType command, int from_id, int to_id, int value, const std::vector<uint8_t>& buf_vec);
 };
