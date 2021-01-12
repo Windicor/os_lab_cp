@@ -1,0 +1,1241 @@
+\section{Общий метод и алгоритм решения}
+
+Проект будет состоять из сервера и клиета, собираться при помощи утилиты make. Работать будет на основе сервера сообщений ZMQ и сокетов ipc. Для работы с сервером сообщений буду использовать код, написанный в процессе работы над лабораторной 6-8. Клиент работает в двух потоках: первый - взаимодействие с пользователем и отправка сообщений, второй - получение сообщений. Сервер работает в одном потоке, реагируя на поступающие сообщения.
+
+При запуске клиент дожидается ответа от сервера, затем устанавливается специально выделенная пара сокетов для взаимодействия сервера с конкретным клиентом. Каждому клиенту присваевается временный идентификатор. Затем пользователь либо регистрируется, либо входит по зарегистрированной паре логин-пароль. Затем пользователь выбирает, с кем хочет соединиться для переписки (по никнейму). В случае успеха появляется возможность обмена сообщениями и файлами.
+
+Текстовые сообщения ограничены в длине 1000-ей знаков. Файлы отправляются пакетами по 1 Мб. Логин и пароль хранятся в зашифрованном виде.
+
+\pagebreak
+
+\section{Исходный код}
+
+\textbf{m\_zmq.h}
+
+\begin{lstlisting}[language=C++]
+
+#pragma once
+
+#include <memory>
+#include <string>
+
+#include "message.h"
+
+void* create_zmq_context();
+void destroy_zmq_context(void* context);
+
+enum class SocketType {
+  PUBLISHER,
+  SUBSCRIBER
+};
+void* create_zmq_socket(void* context, SocketType type);
+void close_zmq_socket(void* socket);
+
+const std::string ENDPOINT_PROTOCOL = "ipc://";
+const std::string ENDPOINT_FOLDER = "tmp/";
+enum class EndpointType {
+  SERVER_PUB_GENERAL,
+  SERVER_SUB_GENERAL,
+  SERVER_PUB,
+  CLIENT_PUB
+};
+std::string create_endpoint(EndpointType type, int id = 0);
+
+void bind_zmq_socket(void* socket, std::string endpoint);
+void unbind_zmq_socket(void* socket, std::string endpoint);
+void connect_zmq_socket(void* socket, std::string endpoint);
+void disconnect_zmq_socket(void* socket, std::string endpoint);
+
+void send_zmq_msg(void* socket, std::shared_ptr<Message> msg);
+std::shared_ptr<Message> get_zmq_msg(void* socket);
+
+\end{lstlisting}
+
+\textbf{m\_zmq.cpp}
+
+\begin{lstlisting}[language=C++]
+
+#include "m_zmq.h"
+
+#include <unistd.h>
+#include <zmq.h>
+
+#include <algorithm>
+#include <cstring>
+#include <iostream>
+
+using namespace std;
+
+void* create_zmq_context() {
+  void* context = zmq_ctx_new();
+  if (context == NULL) {
+    throw runtime_error("Can't create new context. pid:" + to_string(getpid()));
+  }
+  return context;
+}
+
+void destroy_zmq_context(void* context) {
+  if (zmq_ctx_destroy(context) != 0) {
+    throw runtime_error("Can't destroy context. pid:" + to_string(getpid()));
+  }
+}
+
+int get_zmq_socket_type(SocketType type) {
+  switch (type) {
+    case SocketType::PUBLISHER:
+      return ZMQ_PUB;
+    case SocketType::SUBSCRIBER:
+      return ZMQ_SUB;
+    default:
+      throw logic_error("Undefined socket type");
+  }
+}
+
+void* create_zmq_socket(void* context, SocketType type) {
+  int zmq_type = get_zmq_socket_type(type);
+  void* socket = zmq_socket(context, zmq_type);
+  if (socket == NULL) {
+    throw runtime_error("Can't create socket");
+  }
+  if (zmq_type == ZMQ_SUB) {
+    if (zmq_setsockopt(socket, ZMQ_SUBSCRIBE, 0, 0) == -1) {
+      throw runtime_error("Can't set ZMQ_SUBSCRIBE option");
+    }
+  }
+  int linger_period = 0;
+  if (zmq_setsockopt(socket, ZMQ_LINGER, &linger_period, sizeof(int)) == -1) {
+    throw runtime_error("Can't set ZMQ_LINGER option");
+  }
+  return socket;
+}
+
+void close_zmq_socket(void* socket) {
+  sleep(1);  // Don't comment it, because sometimes zmq_close blocks
+  if (zmq_close(socket) != 0) {
+    throw runtime_error("Can't close socket");
+  }
+}
+
+string create_endpoint(EndpointType type, int id) {
+  switch (type) {
+    case EndpointType::SERVER_PUB_GENERAL:
+      return ENDPOINT_PROTOCOL + ENDPOINT_FOLDER + "server_pub_general"s;
+    case EndpointType::SERVER_SUB_GENERAL:
+      return ENDPOINT_PROTOCOL + ENDPOINT_FOLDER + "server_sub_general"s;
+    case EndpointType::SERVER_PUB:
+      return ENDPOINT_PROTOCOL + ENDPOINT_FOLDER + "server_pub_"s + to_string(id);
+    case EndpointType::CLIENT_PUB:
+      return ENDPOINT_PROTOCOL + ENDPOINT_FOLDER + "client_pub_"s + to_string(id);
+    default:
+      throw logic_error("Undefined endpoint type");
+  }
+}
+
+void bind_zmq_socket(void* socket, string endpoint) {
+  if (zmq_bind(socket, endpoint.data()) != 0) {
+    throw runtime_error("Can't bind socket (create 'tmp' folder)");
+  }
+}
+
+void unbind_zmq_socket(void* socket, string endpoint) {
+  if (zmq_unbind(socket, endpoint.data()) != 0) {
+    throw runtime_error("Can't unbind socket");
+  }
+}
+
+void connect_zmq_socket(void* socket, string endpoint) {
+  if (zmq_connect(socket, endpoint.data()) != 0) {
+    throw runtime_error("Can't connect socket (create 'tmp' folder)");
+  }
+}
+
+void disconnect_zmq_socket(void* socket, string endpoint) {
+  if (zmq_disconnect(socket, endpoint.data()) != 0) {
+    throw runtime_error("Can't disconnect socket");
+  }
+}
+
+void create_zmq_msg(zmq_msg_t* zmq_msg, shared_ptr<Message> msg_ptr) {
+  switch (msg_ptr->type()) {
+    case MessageType::BASIC:
+      zmq_msg_init_size(zmq_msg, sizeof(Message));
+      *(Message*)zmq_msg_data(zmq_msg) = *(Message*)msg_ptr.get();
+      break;
+    case MessageType::TEXT:
+      zmq_msg_init_size(zmq_msg, sizeof(TextMessage));
+      *(TextMessage*)zmq_msg_data(zmq_msg) = *(TextMessage*)msg_ptr.get();
+      break;
+    case MessageType::FILE:
+      zmq_msg_init_size(zmq_msg, sizeof(FileMessage));
+      *(FileMessage*)zmq_msg_data(zmq_msg) = *(FileMessage*)msg_ptr.get();
+      break;
+    default:
+      throw logic_error("Unemplemented message type");
+  }
+}
+
+void send_zmq_msg(void* socket, shared_ptr<Message> msg_ptr) {
+  zmq_msg_t zmq_msg;
+  create_zmq_msg(&zmq_msg, msg_ptr);
+  if (!zmq_msg_send(&zmq_msg, socket, 0)) {
+    throw runtime_error("Can't send message");
+  }
+  zmq_msg_close(&zmq_msg);
+}
+
+shared_ptr<Message> get_zmq_msg(void* socket) {
+  zmq_msg_t zmq_msg;
+  zmq_msg_init(&zmq_msg);
+  if (zmq_msg_recv(&zmq_msg, socket, 0) == -1) {
+    return Message::error_message();
+  }
+  shared_ptr<Message> msg_ptr = make_shared<Message>(*(Message*)zmq_msg_data(&zmq_msg));
+
+  switch (msg_ptr->type()) {
+    case MessageType::BASIC:
+      break;
+    case MessageType::TEXT:
+      msg_ptr = make_shared<TextMessage>(*(TextMessage*)zmq_msg_data(&zmq_msg));
+      break;
+    case MessageType::FILE:
+      msg_ptr = make_shared<FileMessage>(*(FileMessage*)zmq_msg_data(&zmq_msg));
+      break;
+    default:
+      throw logic_error("Unemplemented message type");
+  }
+
+  zmq_msg_close(&zmq_msg);
+  return msg_ptr;
+}
+
+\end{lstlisting}
+
+\textbf{message.h}
+
+\begin{lstlisting}[language=C++]
+
+#pragma once
+
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <vector>
+
+enum class MessageType {
+  BASIC,
+  TEXT,
+  FILE
+};
+
+enum class CommandType {
+  ERROR,
+  CONNECT,
+  DISCONNECT,
+  TEXT,
+  REGISTER,
+  LOGIN,
+  CREATE_CHAT,
+  LEFT_CHAT,
+  FILE_NAME,
+  FILE_PART
+};
+
+class Message {
+ protected:
+  MessageType type_ = MessageType::BASIC;
+
+ public:
+  CommandType command = CommandType::ERROR;
+  int from_id = 0;
+  int to_id = 0;
+  int value = 0;
+
+  Message() = default;
+  Message(CommandType command, int from_id, int to_id, int value);
+  virtual ~Message() = default;
+
+  std::string get_stats() const;
+  MessageType type() const {
+    return type_;
+  }
+
+  static std::shared_ptr<Message> error_message();
+  static std::shared_ptr<Message> connect_message(int id);
+  static std::shared_ptr<Message> disconnect_message(int id);
+  static std::shared_ptr<Message> left_chat_message(int id);
+};
+
+class TextMessage : public Message {
+ public:
+  static const size_t MAX_MESSAGE_SIZE = 1024;
+
+  char text[MAX_MESSAGE_SIZE + 1];
+
+  TextMessage();
+  TextMessage(CommandType command, int from_id, int to_id, const std::string& text, int value = 0);
+};
+
+class FileMessage : public Message {
+ public:
+  static const int COMMON_PART = 0;
+  static const int LAST_PART = 1;
+
+  static const size_t BUF_SIZE = 1000000;
+
+  uint8_t buf[BUF_SIZE];
+  size_t size;
+
+  FileMessage(CommandType command, int from_id, int to_id, int value, const std::vector<uint8_t>& buf_vec);
+};
+
+\end{lstlisting}
+
+\textbf{message.cpp}
+
+\begin{lstlisting}[language=C++]
+
+#include "message.h"
+
+#include <unistd.h>
+
+#include <cstring>
+#include <stdexcept>
+
+using namespace std;
+
+Message::Message(CommandType command, int from_id, int to_id, int value)
+    : command(command),
+      from_id(from_id),
+      to_id(to_id),
+      value(value) {
+}
+
+std::string Message::get_stats() const {
+  return to_string(static_cast<int>(command)) + " " + to_string(from_id) + " " + to_string(to_id) + " " + to_string(value);
+}
+shared_ptr<Message> Message::error_message() {
+  return make_shared<Message>(CommandType::ERROR, 0, 0, 0);
+}
+shared_ptr<Message> Message::connect_message(int id) {
+  return make_shared<Message>(CommandType::CONNECT, id, 0, 0);
+}
+shared_ptr<Message> Message::disconnect_message(int id) {
+  return make_shared<Message>(CommandType::DISCONNECT, id, 0, 0);
+}
+shared_ptr<Message> Message::left_chat_message(int id) {
+  return make_shared<Message>(CommandType::LEFT_CHAT, id, 0, 0);
+}
+
+TextMessage::TextMessage() {
+  type_ = MessageType::TEXT;
+  text[0] = '\0';
+}
+TextMessage::TextMessage(CommandType command, int from_id, int to_id, const string& text_str, int value)
+    : Message(command, from_id, to_id, value) {
+  type_ = MessageType::TEXT;
+  if (text_str.size() > MAX_MESSAGE_SIZE) {
+    throw logic_error("Message text can't be longer, than MAX_MESSAGE_SIZE");
+  }
+  memcpy(text, text_str.data(), text_str.size() + 1);
+}
+
+FileMessage::FileMessage(CommandType command, int from_id, int to_id, int value, const vector<uint8_t>& buf_vec)
+    : Message(command, from_id, to_id, value) {
+  type_ = MessageType::FILE;
+  if (buf_vec.size() > BUF_SIZE) {
+    throw logic_error("File message size cannot be more than BUF_SIZE");
+  }
+  size = buf_vec.size();
+  memcpy(buf, buf_vec.data(), buf_vec.size());
+}
+
+
+\end{lstlisting}
+
+\textbf{socket.h}
+
+\begin{lstlisting}[language=C++]
+
+#pragma once
+
+#include <string>
+
+#include "m_zmq.h"
+
+enum class ConnectionType {
+  BIND,
+  CONNECT
+};
+
+class Socket {
+ public:
+  Socket(void* context, SocketType socket_type, std::string endpoint);
+  ~Socket();
+
+  void send(std::shared_ptr<Message> message);
+  std::shared_ptr<Message> receive();
+
+  void subscribe(std::string endpoint);
+  void unsubscribe(std::string endpoint);
+  std::string endpoint() const;
+
+ private:
+  void* socket_;
+  SocketType socket_type_;
+  std::string endpoint_;
+};
+
+\end{lstlisting}
+
+\textbf{client.h}
+
+\begin{lstlisting}[language=C++]
+
+#pragma once
+
+#include <unistd.h>
+
+#include <cstdint>
+#include <filesystem>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "logger.h"
+#include "socket.h"
+
+class Client {
+ public:
+  Client();
+  ~Client();
+
+  void log(std::string message);
+  void connect_to_server();
+  void disconnect_from_server();
+
+  void enter_in_system();
+  void register_form();
+  void login_form();
+
+  void send_text_msg(std::string message);
+  void send_file_msg(std::filesystem::path path);
+  void enter_chat(std::string uname);
+  void leave_chat();
+
+  int id() const;
+
+  enum class Status {
+    UNLOGGED,
+    LOGGED,
+    LOG_ERROR,
+    IN_CHAT
+  };
+  Status status = Status::UNLOGGED;
+
+  friend void* second_thread(void* cli_arg);
+
+ private:
+  int id_ = -1;
+  void* context_ = nullptr;
+  std::unique_ptr<Socket> publiser_;
+  std::unique_ptr<Socket> subscriber_;
+
+  pthread_t second_thread_id_;
+  bool server_is_avaible_ = false;
+
+  bool terminated_ = false;
+  Logger logger_ = Logger("log.txt");
+
+  void send(std::shared_ptr<Message> message);
+  std::shared_ptr<Message> receive();
+  void send_file_part_msg(const std::vector<uint8_t>& file_part, int value);
+
+  void leave_chat_actions();
+  std::ifstream fin;
+  std::ofstream fout;
+};
+
+\end{lstlisting}
+
+\textbf{client.cpp}
+
+\begin{lstlisting}[language=C++]
+
+#include "client.h"
+
+#include <cstdlib>
+#include <ctime>
+#include <fstream>
+#include <iostream>
+
+#include "m_zmq.h"
+#include "md5sum.h"
+
+using namespace std;
+
+const int ERR_LOOP = 2;
+const int MESSAGE_WAITING_TIME = 1;
+
+const string FILES_FOLDER = "files/";
+
+void* second_thread(void* cli_arg) {
+  Client* client_ptr = (Client*)cli_arg;
+  try {
+    string endpoint = create_endpoint(EndpointType::SERVER_PUB_GENERAL);
+    client_ptr->subscriber_ = make_unique<Socket>(client_ptr->context_, SocketType::SUBSCRIBER, move(endpoint));
+
+    while (!client_ptr->terminated_) {
+      shared_ptr<Message> msg_ptr = client_ptr->receive();
+      if (msg_ptr->command == CommandType::ERROR) {
+        if (client_ptr->terminated_) {
+          return NULL;
+        } else {
+          cout << "Error" << endl;
+          continue;
+        }
+      }
+      if (msg_ptr->to_id != client_ptr->id()) {
+        continue;
+      }
+      client_ptr->log("Message received by client: "s + msg_ptr->get_stats());
+      switch (msg_ptr->command) {
+        case CommandType::CONNECT:
+          client_ptr->id_ = msg_ptr->value;
+          client_ptr->server_is_avaible_ = true;
+
+          endpoint = create_endpoint(EndpointType::CLIENT_PUB, client_ptr->id());
+          client_ptr->publiser_ = nullptr;
+          client_ptr->publiser_ = make_unique<Socket>(client_ptr->context_, SocketType::PUBLISHER, move(endpoint));
+
+          endpoint = create_endpoint(EndpointType::SERVER_PUB, client_ptr->id());
+          client_ptr->subscriber_ = nullptr;
+          client_ptr->subscriber_ = make_unique<Socket>(client_ptr->context_, SocketType::SUBSCRIBER, move(endpoint));
+          break;
+        case CommandType::REGISTER:
+        case CommandType::LOGIN:
+          if (msg_ptr->value) {
+            client_ptr->status = Client::Status::LOGGED;
+          } else {
+            client_ptr->status = Client::Status::LOG_ERROR;
+          }
+          break;
+        case CommandType::CREATE_CHAT:
+          if (msg_ptr->value) {
+            cout << "You're in chat with: " << ((TextMessage*)msg_ptr.get())->text << endl;
+            client_ptr->status = Client::Status::IN_CHAT;
+          } else {
+            cout << "Can't create chat" << endl;
+          }
+          break;
+        case CommandType::LEFT_CHAT:
+          cout << "Companion left the chat" << endl;
+          cout << "Enter your companion username" << endl;
+          client_ptr->leave_chat_actions();
+          break;
+        case CommandType::TEXT:
+          cout << ">" << ((TextMessage*)msg_ptr.get())->text << endl;
+          break;
+        case CommandType::FILE_NAME: {
+          if (!filesystem::exists(FILES_FOLDER)) {
+            filesystem::create_directory(FILES_FOLDER);
+          }
+          string name = ((TextMessage*)msg_ptr.get())->text;
+          cout << "Filename: " << name << endl;
+          client_ptr->fout.open(FILES_FOLDER + name, ios::binary);
+          if (!client_ptr->fout.is_open()) {
+            throw runtime_error("Cannot open a file");
+          }
+          break;
+        }
+        case CommandType::FILE_PART: {
+          FileMessage& file_msg = *(FileMessage*)msg_ptr.get();
+          client_ptr->fout.write(reinterpret_cast<char*>(file_msg.buf), file_msg.size);
+          if (file_msg.value == FileMessage::LAST_PART) {
+            client_ptr->fout.close();
+            cout << "File is received" << endl;
+          }
+          break;
+        }
+        default:
+          throw logic_error("Undefined command type");
+          break;
+      }
+    }
+
+  } catch (exception& ex) {
+    client_ptr->log("Client exctption: "s + ex.what() + "\nTerminated by exception on client receive loop"s);
+    cout << "Terminated by error on loop" << endl;
+    exit(ERR_LOOP);
+  }
+  return NULL;
+}
+
+Client::Client() {
+  log("Starting client...");
+  context_ = create_zmq_context();
+
+  if (!filesystem::exists(ENDPOINT_FOLDER)) {
+    filesystem::create_directory(ENDPOINT_FOLDER);
+  }
+
+  string endpoint = create_endpoint(EndpointType::SERVER_SUB_GENERAL);
+  publiser_ = make_unique<Socket>(context_, SocketType::PUBLISHER, move(endpoint));
+
+  if (pthread_create(&second_thread_id_, 0, second_thread, this) != 0) {
+    cout << "Can't run second thread" << endl;
+    exit(ERR_LOOP);
+  }
+
+  srand(time(NULL) + clock());
+  id_ = rand();
+}
+
+Client::~Client() {
+  if (terminated_) {
+    log("Client double termination");
+    return;
+  }
+  disconnect_from_server();
+  log("Destroying client...");
+  terminated_ = true;
+
+  try {
+    publiser_ = nullptr;
+    subscriber_ = nullptr;
+    destroy_zmq_context(context_);
+    pthread_join(second_thread_id_, NULL);
+  } catch (exception& ex) {
+    log("Client wasn't destroyed: "s + ex.what());
+  }
+}
+
+int Client::id() const {
+  return id_;
+}
+
+void Client::send(shared_ptr<Message> message) {
+  publiser_->send(message);
+  log("Message sended from client: "s + message->get_stats());
+}
+
+shared_ptr<Message> Client::receive() {
+  return subscriber_->receive();
+}
+
+void Client::log(string message) {
+  logger_.log(move(message));
+}
+
+void Client::connect_to_server() {
+  while (!server_is_avaible_) {
+    cout << "Trying to connect to the server..." << endl;
+    send(Message::connect_message(id_));
+    sleep(MESSAGE_WAITING_TIME);
+  }
+  cout << "Connected to server" << endl;
+}
+
+void Client::disconnect_from_server() {
+  cout << "Disconnecting from the server..." << endl;
+  send(Message::disconnect_message(id_));
+}
+
+const int LOGIN_CHECK_COUNT = 5;
+void Client::login_form() {
+  cout << "Enter login and password" << endl;
+  string uname, log, pas;
+  if (!(cin >> log >> pas)) {
+    throw runtime_error("Incorrect input");
+  }
+  status = Client::Status::UNLOGGED;
+  send(make_shared<TextMessage>(CommandType::LOGIN, id_, 0, md5sum(log) + " "s + md5sum(pas)));
+  int cnt = LOGIN_CHECK_COUNT;
+  while (cnt-- > 0 && status == Client::Status::UNLOGGED) {
+    cout << "Checking..." << endl;
+    sleep(1);
+  }
+  if (status == Client::Status::LOG_ERROR || status == Client::Status::UNLOGGED) {
+    cout << "Please, try again" << endl;
+  }
+}
+
+void Client::register_form() {
+  cout << "Enter username, login and password" << endl;
+  string uname, log, pas;
+  if (!(cin >> uname >> log >> pas)) {
+    throw runtime_error("Incorrect input");
+  }
+  status = Client::Status::UNLOGGED;
+  send(make_shared<TextMessage>(CommandType::REGISTER, id_, 0, uname + " "s + md5sum(log) + " "s + md5sum(pas)));
+  int cnt = LOGIN_CHECK_COUNT;
+  while (cnt-- > 0 && status == Client::Status::UNLOGGED) {
+    cout << "Checking..." << endl;
+    sleep(1);
+  }
+  if (status == Client::Status::LOG_ERROR || status == Client::Status::UNLOGGED) {
+    cout << "Please, try again" << endl;
+  }
+}
+
+void Client::enter_in_system() {
+  while (status != Client::Status::LOGGED) {
+    cout << "Do you have an account? (y/n)" << endl;
+    string str;
+    if (!(cin >> str)) {
+      throw runtime_error("Incorrect input");
+    }
+    if (str == "y") {
+      login_form();
+    } else if (str == "n") {
+      register_form();
+    } else {
+      cout << "Please, answer 'y' or 'n'" << endl;
+    }
+  }
+  cout << "Autorized" << endl;
+}
+
+void Client::send_text_msg(string message) {
+  send(make_shared<TextMessage>(CommandType::TEXT, id_, 0, move(message)));
+}
+
+void Client::send_file_part_msg(const vector<uint8_t>& file_part, int value) {
+  send(make_shared<FileMessage>(CommandType::FILE_PART, id_, 0, value, move(file_part)));
+}
+
+void Client::send_file_msg(filesystem::path path) {
+  if (!filesystem::is_regular_file(path)) {
+    cout << "No such file" << endl;
+    return;
+  }
+  send(make_shared<TextMessage>(CommandType::FILE_NAME, id_, 0, path.filename()));
+  fin.open(path, ios::binary);
+  if (!fin.is_open()) {
+    cout << "Cannot open a file" << endl;
+    return;
+  }
+  vector<uint8_t> vec(FileMessage::BUF_SIZE);
+  size_t file_size = filesystem::file_size(path);
+  while (fin) {
+    fin.read(reinterpret_cast<char*>(vec.data()), FileMessage::BUF_SIZE);
+    vec.resize(fin.gcount());
+
+    if (fin) {
+      send_file_part_msg(vec, FileMessage::COMMON_PART);
+    } else {
+      send_file_part_msg(vec, FileMessage::LAST_PART);
+    }
+  }
+  fin.close();
+  cout << "File is sent" << endl;
+}
+
+void Client::enter_chat(string uname) {
+  cout << "Trying to create chat whith " << uname << "..." << endl;
+  send(make_shared<TextMessage>(CommandType::CREATE_CHAT, id_, 0, move(uname)));
+}
+
+void Client::leave_chat_actions() {
+  status = Client::Status::LOGGED;
+}
+
+void Client::leave_chat() {
+  cout << "Exiting from chat..." << endl;
+  send(Message::left_chat_message(id_));
+  leave_chat_actions();
+  cout << "Enter your companion username" << endl;
+}
+
+
+\end{lstlisting}
+
+\textbf{client\_main.cpp}
+
+\begin{lstlisting}[language=C++]
+
+#include <signal.h>
+
+#include <iostream>
+#include <sstream>
+#include <string>
+
+#include "client.h"
+
+using namespace std;
+
+const int ERR_TERMINATED = 1;
+const int UNIVERSAL_MESSAGE_ID = -256;
+
+Client* client_ptr = nullptr;
+void TerminateByUser(int) {
+  if (client_ptr != nullptr) {
+    client_ptr->~Client();
+    client_ptr->log("Client is terminated by user");
+  }
+  exit(0);
+}
+
+const string EXIT_COMMAND = "\\exit";
+const string FILE_COMMAND = "\\file";
+
+int main() {
+  try {
+    if (signal(SIGINT, TerminateByUser) == SIG_ERR) {
+      throw runtime_error("Can't set SIGINT signal");
+    }
+    if (signal(SIGSEGV, TerminateByUser) == SIG_ERR) {
+      throw runtime_error("Can't set SIGSEGV signal");
+    }
+
+    Client client;
+    client_ptr = &client;
+    client.log("Client is started correctly");
+
+    client.connect_to_server();
+    client.enter_in_system();
+
+    cout << "Enter your companion username" << endl;
+    string text;
+    while (getline(cin, text)) {
+      if (text == "") {
+        continue;
+      }
+      if (text.size() > TextMessage::MAX_MESSAGE_SIZE) {
+        cout << "Too long message" << endl;
+        continue;
+      }
+
+      if (client.status == Client::Status::IN_CHAT) {
+        if (text == EXIT_COMMAND) {
+          client.leave_chat();
+        } else if (text.size() > FILE_COMMAND.size() + 1 && text.substr(0, FILE_COMMAND.size()) == FILE_COMMAND && text[FILE_COMMAND.size()] == ' ') {
+          client.send_file_msg(text.substr(FILE_COMMAND.size() + 1));
+        } else {
+          client.send_text_msg(move(text));
+        }
+      } else {
+        client.enter_chat(move(text));
+      }
+    }
+
+  } catch (exception& ex) {
+    cout << (to_string(getpid()) + " Client exception: "s + ex.what() + "\nClient terminated by exception"s) << endl;
+    exit(ERR_TERMINATED);
+  }
+  return 0;
+}
+
+\end{lstlisting}
+
+\textbf{server.h}
+
+\begin{lstlisting}[language=C++]
+
+#pragma once
+
+#include <unistd.h>
+
+#include <memory>
+#include <optional>
+#include <unordered_map>
+
+#include "logger.h"
+#include "security.h"
+#include "socket.h"
+
+class Online {
+ public:
+  void add_user(std::string username, int id);
+  void remove_user(int id);
+  std::optional<int> get_id(std::string username) const;
+  std::optional<std::string> get_username(int id) const;
+  bool check_username(std::string username) const;
+
+ private:
+  std::unordered_map<int, std::string> id_to_username_;
+  std::unordered_map<std::string, int> username_to_id_;
+};
+
+class Rooms {
+ public:
+  bool add_room(int id1, int id2);
+  void remove_room(int id);
+  std::optional<int> get_companion(int id) const;
+  bool check_companion(int id) const;
+
+ private:
+  std::unordered_map<int, int> rooms_;
+};
+
+class Server {
+ public:
+  Server();
+  ~Server();
+
+  std::shared_ptr<Message> receive();
+
+  void log(std::string message);
+  void add_connection(int id);
+  void remove_connection(int id);
+  void register_form(std::shared_ptr<Message> msg_ptr);
+  void login_form(std::shared_ptr<Message> msg_ptr);
+  void create_room(int from_id, std::string username);
+  void exit_room(int id);
+  void send_from_user_to_user(int from_id, std::shared_ptr<Message> message);
+
+ private:
+  void* context_ = nullptr;
+  std::unique_ptr<Socket> subscriber_;
+  std::unique_ptr<Socket> general_publiser_;
+  std::unordered_map<int, std::unique_ptr<Socket>> id_to_publisher_;
+  Online online_;
+  Rooms rooms_;
+
+  int id_cntr = 0;
+
+  Logger logger_;
+  Security security;
+
+  void send_to_general(std::shared_ptr<Message> message);
+  void send_to_user(int id, std::shared_ptr<Message> message);
+};
+
+
+\end{lstlisting}
+
+\textbf{server.cpp}
+
+\begin{lstlisting}[language=C++]
+
+#include "server.h"
+
+#include <pthread.h>
+#include <signal.h>
+
+#include <filesystem>
+#include <iostream>
+#include <sstream>
+
+#include "m_zmq.h"
+
+using namespace std;
+
+void Online::add_user(std::string username, int id) {
+  id_to_username_[id] = username;
+  username_to_id_[move(username)] = id;
+}
+void Online::remove_user(int id) {
+  auto it = id_to_username_.find(id);
+  if (it != id_to_username_.end()) {
+    string user = it->second;
+    auto it2 = username_to_id_.find(move(user));
+    id_to_username_.erase(it);
+    username_to_id_.erase(it2);
+  } else {
+    cerr << "User to remove not found" << endl;
+  }
+}
+optional<int> Online::get_id(std::string username) const {
+  auto it = username_to_id_.find(move(username));
+  if (it != username_to_id_.end()) {
+    return it->second;
+  } else {
+    return nullopt;
+  }
+}
+optional<std::string> Online::get_username(int id) const {
+  auto it = id_to_username_.find(id);
+  if (it != id_to_username_.end()) {
+    return it->second;
+  } else {
+    return nullopt;
+  }
+}
+bool Online::check_username(std::string username) const {
+  auto it = username_to_id_.find(move(username));
+  return it != username_to_id_.end();
+}
+
+bool Rooms::add_room(int id1, int id2) {
+  if (rooms_.count(id1) > 0 || rooms_.count(id2) > 0) {
+    return false;
+  }
+  rooms_[id1] = id2;
+  rooms_[id2] = id1;
+  return true;
+}
+void Rooms::remove_room(int id) {
+  int id2 = rooms_[id];
+  rooms_.erase(id);
+  rooms_.erase(id2);
+}
+optional<int> Rooms::get_companion(int id) const {
+  auto it = rooms_.find(move(id));
+  if (it != rooms_.end()) {
+    return it->second;
+  } else {
+    return nullopt;
+  }
+}
+bool Rooms::check_companion(int id) const {
+  return (bool)get_companion(id);
+}
+
+Server::Server() {
+  log("Starting server...");
+  context_ = create_zmq_context();
+
+  if (!filesystem::exists(ENDPOINT_FOLDER)) {
+    filesystem::create_directory(ENDPOINT_FOLDER);
+  }
+
+  string endpoint = create_endpoint(EndpointType::SERVER_PUB_GENERAL);
+  general_publiser_ = make_unique<Socket>(context_, SocketType::PUBLISHER, move(endpoint));
+  endpoint = create_endpoint(EndpointType::SERVER_SUB_GENERAL);
+  subscriber_ = make_unique<Socket>(context_, SocketType::SUBSCRIBER, move(endpoint));
+}
+
+Server::~Server() {
+  log("Destroying server...");
+  try {
+    general_publiser_ = nullptr;
+    subscriber_ = nullptr;
+    for (auto& [_, ptr] : id_to_publisher_) {
+      ptr = nullptr;
+    }
+    destroy_zmq_context(context_);
+  } catch (exception& ex) {
+    log("Server wasn't destroyed: "s + ex.what());
+  }
+}
+
+void Server::send_to_general(shared_ptr<Message> message) {
+  general_publiser_->send(message);
+  log("Message sended from server: "s + message->get_stats());
+}
+
+void Server::send_to_user(int id, std::shared_ptr<Message> message) {
+  auto it = id_to_publisher_.find(id);
+  if (it == id_to_publisher_.end()) {
+    log("Message to id, that does not exist");
+    return;
+  }
+  message->from_id = 0;
+  message->to_id = id;
+  id_to_publisher_[id]->send(message);
+  log("Message sended from server to "s + to_string(id) + ": "s + message->get_stats());
+}
+
+void Server::send_from_user_to_user(int from_id, std::shared_ptr<Message> message) {
+  auto opt = rooms_.get_companion(from_id);
+  if (!opt) {
+    send_to_user(from_id, Message::error_message());
+    return;
+  }
+  int to_id = *opt;
+  send_to_user(to_id, message);
+}
+
+shared_ptr<Message> Server::receive() {
+  shared_ptr<Message> message = subscriber_->receive();
+  log("Message received by server: "s + message->get_stats());
+  if (message->type() == MessageType::TEXT) {
+    log("Text: \""s + string(((TextMessage*)message.get())->text) + "\""s);
+  }
+  if (message->type() == MessageType::FILE) {
+    log("Package size: "s + to_string(((FileMessage*)message.get())->size));
+  }
+  return message;
+}
+
+void Server::log(std::string message) {
+  logger_.log(move(message));
+}
+
+void Server::add_connection(int id) {
+  int new_id = ++id_cntr;
+  string endpoint = create_endpoint(EndpointType::SERVER_PUB, new_id);
+  id_to_publisher_[new_id] = make_unique<Socket>(context_, SocketType::PUBLISHER, move(endpoint));
+  endpoint = create_endpoint(EndpointType::CLIENT_PUB, new_id);
+  subscriber_->subscribe(move(endpoint));
+
+  log("Connection added");
+  send_to_general(make_shared<Message>(CommandType::CONNECT, 0, id, new_id));
+}
+
+void print_bool(bool b) {
+  cout << b << endl;
+}
+
+void Server::create_room(int from_id, string username) {
+  auto opt = online_.get_id(username);
+  cout << *online_.get_username(from_id) << "a a" << username << "a" << endl;
+  if (!opt || rooms_.check_companion(from_id) || rooms_.check_companion(*opt) || *online_.get_username(from_id) == username) {
+    send_to_user(from_id, make_shared<Message>(CommandType::CREATE_CHAT, 0, from_id, 0));
+    return;
+  }
+  int to_id = *opt;
+  rooms_.add_room(from_id, to_id);
+  send_to_user(from_id, make_shared<TextMessage>(CommandType::CREATE_CHAT, 0, from_id, *online_.get_username(to_id), 1));
+  send_to_user(to_id, make_shared<TextMessage>(CommandType::CREATE_CHAT, 0, to_id, *online_.get_username(from_id), 1));
+}
+
+void Server::exit_room(int id) {
+  auto opt = rooms_.get_companion(id);
+  if (opt) {
+    int companion_id = *opt;
+    send_to_user(companion_id, make_shared<Message>(CommandType::LEFT_CHAT, 0, companion_id, 0));
+  }
+  rooms_.remove_room(id);
+}
+
+void Server::remove_connection(int id) {
+  exit_room(id);
+  online_.remove_user(id);
+  id_to_publisher_.erase(id);
+  string endpoint = create_endpoint(EndpointType::CLIENT_PUB, id);
+  subscriber_->unsubscribe(move(endpoint));
+  log("Connection removed");
+}
+
+void Server::register_form(std::shared_ptr<Message> msg_ptr) {
+  TextMessage* text_msg_ptr = (TextMessage*)msg_ptr.get();
+  istringstream iss(text_msg_ptr->text);
+  string uname;
+  LogAndPas lap;
+  iss >> uname >> lap;
+  if (security.Register(uname, move(lap))) {
+    send_to_user(msg_ptr->from_id, make_shared<Message>(CommandType::REGISTER, 0, msg_ptr->from_id, 1));
+    online_.add_user(uname, msg_ptr->from_id);
+  } else {
+    send_to_user(msg_ptr->from_id, make_shared<Message>(CommandType::REGISTER, 0, msg_ptr->from_id, 0));
+  }
+}
+
+void Server::login_form(std::shared_ptr<Message> msg_ptr) {
+  TextMessage* text_msg_ptr = (TextMessage*)msg_ptr.get();
+  istringstream iss(text_msg_ptr->text);
+  LogAndPas lap;
+  iss >> lap;
+
+  auto opt_uname = security.get_username(move(lap));
+  if (opt_uname && !online_.check_username(*opt_uname)) {
+    send_to_user(msg_ptr->from_id, make_shared<Message>(CommandType::LOGIN, 0, msg_ptr->from_id, 1));
+    online_.add_user(*opt_uname, msg_ptr->from_id);
+  } else {
+    send_to_user(msg_ptr->from_id, make_shared<Message>(CommandType::LOGIN, 0, msg_ptr->from_id, 0));
+  }
+}
+
+\end{lstlisting}
+
+\textbf{server\_main.cpp}
+
+\begin{lstlisting}[language=C++]
+
+#include <signal.h>
+
+#include <filesystem>
+#include <iostream>
+#include <string>
+
+#include "server.h"
+
+using namespace std;
+
+const int ERR_TERMINATED = 1;
+
+Server* server_ptr = nullptr;
+void TerminateByUser(int) {
+  if (server_ptr != nullptr) {
+    server_ptr->~Server();
+    server_ptr->log("Server is terminated by user");
+  }
+  exit(0);
+}
+
+void parse_cmd(Server& server, shared_ptr<Message> msg_ptr) {
+  switch (msg_ptr->command) {
+    case CommandType::CONNECT:
+      server.add_connection(msg_ptr->from_id);
+      break;
+    case CommandType::DISCONNECT:
+      server.remove_connection(msg_ptr->from_id);
+      break;
+    case CommandType::TEXT:
+      if (msg_ptr->type() != MessageType::TEXT) {
+        server.log("Text command in non text message");
+        break;
+      }
+      server.send_from_user_to_user(msg_ptr->from_id, msg_ptr);
+      break;
+    case CommandType::REGISTER:
+      if (msg_ptr->type() != MessageType::TEXT) {
+        server.log("Register command in non text message");
+        break;
+      }
+      server.register_form(msg_ptr);
+      break;
+    case CommandType::LOGIN:
+      if (msg_ptr->type() != MessageType::TEXT) {
+        server.log("Login command in non text message");
+        break;
+      }
+      server.login_form(msg_ptr);
+      break;
+    case CommandType::CREATE_CHAT:
+      if (msg_ptr->type() != MessageType::TEXT) {
+        server.log("Register command in non text message");
+        break;
+      }
+      server.create_room(msg_ptr->from_id, ((TextMessage*)msg_ptr.get())->text);
+      break;
+    case CommandType::LEFT_CHAT:
+      server.exit_room(msg_ptr->from_id);
+      break;
+    case CommandType::FILE_NAME:
+      if (msg_ptr->type() != MessageType::TEXT) {
+        server.log("FileName command in non text message");
+        break;
+      }
+      server.send_from_user_to_user(msg_ptr->from_id, msg_ptr);
+      break;
+    case CommandType::FILE_PART:
+      if (msg_ptr->type() != MessageType::FILE) {
+        server.log("FilePart command in non file message");
+        break;
+      }
+      server.send_from_user_to_user(msg_ptr->from_id, msg_ptr);
+      break;
+    default:
+      throw logic_error("Unimplemented command type");
+  }
+}
+
+int main() {
+  try {
+    if (signal(SIGINT, TerminateByUser) == SIG_ERR) {
+      throw runtime_error("Can't set SIGINT signal");
+    }
+    if (signal(SIGSEGV, TerminateByUser) == SIG_ERR) {
+      throw runtime_error("Can't set SIGSEGV signal");
+    }
+
+    Server server;
+    server_ptr = &server;
+    server.log("Server is started correctly");
+
+    while (true) {
+      shared_ptr<Message> msg_ptr = server.receive();
+      parse_cmd(server, msg_ptr);
+    }
+  } catch (exception& ex) {
+    cerr << ("Server exception: "s + ex.what() + "\nServer is terminated by exception");
+  }
+  return ERR_TERMINATED;
+}
+
+
+\end{lstlisting}
+
+\pagebreak

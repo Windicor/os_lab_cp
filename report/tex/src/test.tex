@@ -1,0 +1,65 @@
+\section{Пример работы}
+
+Сборка программы:
+
+\begin{verbatim}
+windicor@Lina-HP:~$ make 
+g++ -std=c++17 -pedantic -Wall -Wextra -Wno-unused-variable -c server_main.cpp -o server_main.o -lzmq -lpthread
+g++ -std=c++17 -pedantic -Wall -Wextra -Wno-unused-variable -c server.cpp -o server.o -lzmq -lpthread
+g++ -std=c++17 -pedantic -Wall -Wextra -Wno-unused-variable -c m_zmq.cpp -o m_zmq.o -lzmq -lpthread
+g++ -std=c++17 -pedantic -Wall -Wextra -Wno-unused-variable -c socket.cpp -o socket.o -lzmq -lpthread
+g++ -std=c++17 -pedantic -Wall -Wextra -Wno-unused-variable -c logger.cpp -o logger.o -lzmq -lpthread
+g++ -std=c++17 -pedantic -Wall -Wextra -Wno-unused-variable -c message.cpp -o message.o -lzmq -lpthread
+g++ -std=c++17 -pedantic -Wall -Wextra -Wno-unused-variable -c security.cpp -o security.o -lzmq -lpthread
+g++ -std=c++17 -pedantic -Wall -Wextra -Wno-unused-variable -c md5sum.cpp -o md5sum.o -lzmq -lpthread
+g++ -std=c++17 -pedantic -Wall -Wextra -Wno-unused-variable server_main.o server.o m_zmq.o socket.o logger.o message.o security.o md5sum.o -o server -lzmq -lpthread
+g++ -std=c++17 -pedantic -Wall -Wextra -Wno-unused-variable -c client_main.cpp -o client_main.o -lzmq -lpthread       
+g++ -std=c++17 -pedantic -Wall -Wextra -Wno-unused-variable -c client.cpp -o client.o -lzmq -lpthread
+g++ -std=c++17 -pedantic -Wall -Wextra -Wno-unused-variable client_main.o client.o m_zmq.o socket.o logger.o message.o security.o md5sum.o -o client -lzmq -lpthread
+\end{verbatim}
+
+Запускаем сервер:
+
+\begin{verbatim}
+windicor@Lina-HP:~$ ./server
+277: Starting server...
+277: Server is started correctly
+//тут происходит какая-то работа, в конце завершаем Ctrl+C
+277: Destroying server...
+277: Server is terminated by user
+\end{verbatim}
+
+Запускаем клиент, входим, соединяемся с user2 (который также защёл в систему), обмениваемся парой сообщений, получаем файл и отправляем назад:
+
+\begin{verbatim}
+windicor@Lina-HP:~$ ./client
+Trying to connect to the server...
+Trying to connect to the server...
+Connected to server
+Do you have an account? (y/n)
+y
+Enter login and password
+user qwerty123
+Checking...
+Autorized
+Enter your companion username
+user1
+Trying to create chat whith user1...
+You're in chat with: user1
+Hi!
+>Hi!
+I'm user
+>I'm user1
+Filename: file_to_user
+File is received
+\file my_files/file_to_user
+File is sent
+\exit
+Exiting from chat...
+Enter your companion username
+Disconnecting from the server...
+\end{verbatim}
+
+\pagebreak
+
+
